@@ -55,29 +55,7 @@ export default function HomeFeed() {
                         </button>
                     </div>
 
-                    <div className="bg-white border border-border p-6 rounded-xl">
-                        <h3 className="font-display text-lg mb-4">Network Insights</h3>
-                        <div className="space-y-4">
-                            <div className="flex justify-between items-center">
-                                <span className="text-sm text-text-secondary flex items-center gap-2">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-accent-green" /> Nodes Online
-                                </span>
-                                <span className="font-mono text-sm">1,248</span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                                <span className="text-sm text-text-secondary flex items-center gap-2">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-primary" /> Active Signals
-                                </span>
-                                <span className="font-mono text-sm">342</span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                                <span className="text-sm text-text-secondary flex items-center gap-2">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-accent-blue" /> Help Rate
-                                </span>
-                                <span className="font-mono text-sm">74%</span>
-                            </div>
-                        </div>
-                    </div>
+
                 </aside>
                 <RaiseSignalModal 
                     isOpen={isRaiseModalOpen} 

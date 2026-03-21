@@ -20,7 +20,7 @@ export default function RaiseSignalModal({ isOpen, onClose, editSignal }: RaiseS
     const [category, setCategory] = useState('Talent');
     const [headline, setHeadline] = useState('');
     const [details, setDetails] = useState('');
-    const [urgency, setUrgency] = useState('Normal');
+    const [duration, setDuration] = useState(0);
 
     useEffect(() => {
         if (isOpen && editSignal) {
@@ -28,12 +28,14 @@ export default function RaiseSignalModal({ isOpen, onClose, editSignal }: RaiseS
             setCategory(editSignal.category);
             setHeadline(editSignal.title);
             setDetails(editSignal.description);
-            setUrgency(editSignal.strength);
+            // Try to parse number from 'X Days' or fallback to 7
+            const parsedDuration = parseInt(editSignal.strength.split(' ')[0]);
+            setDuration(isNaN(parsedDuration) ? 7 : parsedDuration);
         } else if (isOpen && !editSignal) {
             setHeadline('');
             setDetails('');
             setCategory('Talent');
-            setUrgency('Normal');
+            setDuration(0);
             setSignalType('need');
         }
     }, [isOpen, editSignal]);
@@ -41,30 +43,32 @@ export default function RaiseSignalModal({ isOpen, onClose, editSignal }: RaiseS
     if (!isOpen) return null
 
     const handleBroadcast = () => {
-        if (!headline || !details) return;
+        if (!headline || !details || duration === 0) return;
         
         if (editSignal) {
             useSignalStore.getState().updateSignal(editSignal.id, {
                 title: headline,
                 category: category,
                 description: details,
-                strength: urgency,
+                strength: `${duration} Days`,
                 type: signalType
             });
         } else {
-            const namePart = (name || 'user').toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
-            const rolePart = (role || 'member').toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
-            const expectedBase = `${namePart}_${rolePart}`;
+            const currentUsername = useOnboardingStore.getState().username || 'user_startup';
+            const roleMatch = currentUsername.match(/_([^_]+)$/);
+            const roleSuffix = roleMatch ? roleMatch[0] : '_member';
+            const basePart = currentUsername.replace(new RegExp(roleSuffix + '$'), '');
+            const expectedBase = currentUsername;
 
-            // Always regenerate from current name+role so profile changes are reflected
+            // Always regenerate unique checks from current store username so profile changes are reflected
             const existingSignals = useSignalStore.getState().signals;
             let finalUsername = expectedBase;
             let counter = 1;
             
             // Ensure uniqueness — skip signals owned by the same user (they can have multiple signals)
-            const usernamesByOthers = existingSignals.filter(s => s.username !== username);
+            const usernamesByOthers = existingSignals.filter(s => s.username !== useOnboardingStore.getState().username);
             while (usernamesByOthers.some(s => s.username === finalUsername)) {
-                finalUsername = `${namePart}${counter}_${rolePart}`;
+                finalUsername = `${basePart}${counter}${roleSuffix}`;
                 counter++;
             }
             
@@ -77,7 +81,7 @@ export default function RaiseSignalModal({ isOpen, onClose, editSignal }: RaiseS
                 timeAgo: 'Just now',
                 category: category,
                 description: details,
-                strength: urgency,
+                strength: `${duration} Days`,
                 type: signalType
             });
         }
@@ -102,21 +106,7 @@ export default function RaiseSignalModal({ isOpen, onClose, editSignal }: RaiseS
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                        {/* Type Toggle */}
-                        <div className="flex bg-surface-2 p-1 rounded-lg border border-border">
-                            <button 
-                                onClick={() => setSignalType('need')}
-                                className={`flex-1 py-3 text-sm font-medium rounded-md transition-all ${signalType === 'need' ? 'bg-white shadow-sm filter drop-shadow-sm text-black' : 'text-text-secondary hover:text-black font-normal'}`}
-                            >
-                                I Need Something
-                            </button>
-                            <button 
-                                onClick={() => setSignalType('help')}
-                                className={`flex-1 py-3 text-sm font-medium rounded-md transition-all ${signalType === 'help' ? 'bg-white shadow-sm filter drop-shadow-sm text-black' : 'text-text-secondary hover:text-black font-normal'}`}
-                            >
-                                I Can Help
-                            </button>
-                        </div>
+
 
                         {/* Category */}
                         <section>
@@ -157,34 +147,65 @@ export default function RaiseSignalModal({ isOpen, onClose, editSignal }: RaiseS
                             />
                         </section>
 
-                        {/* Urgency */}
+                        {/* Duration */}
                         <section>
-                            <label className="text-sm font-medium text-black mb-2 block">Urgency Level</label>
-                            <select 
-                                className="w-full bg-white p-3 rounded-xl border border-border outline-none focus:border-black text-sm shadow-sm appearance-none cursor-pointer"
-                                value={urgency}
-                                onChange={(e) => setUrgency(e.target.value)}
-                                style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'%23a1a1aa\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\'%3E%3C/path%3E%3C/svg%3E")', backgroundPosition: 'right 16px center', backgroundRepeat: 'no-repeat', backgroundSize: '16px' }}
-                            >
-                                <option value="High">High</option>
-                                <option value="Normal">Normal</option>
-                                <option value="Low">Low</option>
-                            </select>
-                            <div className="mt-4 flex gap-5 text-xs font-medium">
-                                <div className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-[#FF5722]"></span> <span className={`${urgency === 'High' ? 'text-[#FF5722]' : 'text-text-muted'}`}>High</span></div>
-                                <div className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-[#2196F3]"></span> <span className={`${urgency === 'Normal' ? 'text-[#2196F3]' : 'text-text-muted'}`}>Normal</span></div>
-                                <div className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-[#9E9E9E]"></span> <span className={`${urgency === 'Low' ? 'text-[#9E9E9E]' : 'text-text-muted'}`}>Low</span></div>
+                            <label className="text-sm font-medium text-black mb-2 flex justify-between items-center block">
+                                <span>Signal Duration <span className="text-red-500">*</span></span>
+                                <span className={`font-mono font-bold ${duration === 0 ? 'text-text-muted' : duration > 7 ? 'text-orange-600' : 'text-primary'}`}>
+                                    {duration === 0 ? 'Not Selected' : `${duration} Days`}
+                                </span>
+                            </label>
+                            <div className={`p-4 rounded-xl border transition-colors ${duration > 7 ? 'bg-orange-50/50 border-orange-200' : duration === 0 ? 'bg-surface-2 border-red-200' : 'bg-surface-2 border-border'}`}>
+                                <input 
+                                    type="range" 
+                                    min="0" 
+                                    max="30" 
+                                    className="w-full accent-black cursor-pointer"
+                                    value={duration}
+                                    onChange={(e) => setDuration(parseInt(e.target.value))}
+                                />
+                                <div className="flex justify-between text-[10px] text-text-muted mt-2 font-medium uppercase tracking-widest">
+                                    <span>0</span>
+                                    <span>1 Day</span>
+                                    <span className="text-black font-bold">7 Days (Free Max)</span>
+                                    <span>30 Days</span>
+                                </div>
                             </div>
+                            
+                            <AnimatePresence>
+                                {duration > 7 && (
+                                    <motion.div 
+                                        initial={{ opacity: 0, height: 0 }}
+                                        animate={{ opacity: 1, height: 'auto' }}
+                                        exit={{ opacity: 0, height: 0 }}
+                                        className="mt-4 bg-orange-50 border border-orange-200 p-3 rounded-lg flex items-start gap-3 overflow-hidden"
+                                    >
+                                        <div className="bg-orange-100 p-1.5 rounded-full mt-0.5">
+                                            <Zap className="w-3.5 h-3.5 text-orange-600 fill-orange-600" />
+                                        </div>
+                                        <div>
+                                            <h4 className="text-xs font-bold text-orange-900">StarPro Feature</h4>
+                                            <p className="text-[10px] text-orange-800 mt-0.5 leading-relaxed">Signals lasting longer than 7 days require an active StarPro subscription. Please upgrade to broadcast for {duration} days.</p>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
                         </section>
                     </div>
 
                     <div className="p-6">
                         <button 
                             onClick={handleBroadcast}
-                            disabled={!headline || !details}
-                            className="w-full bg-black text-white px-8 py-3.5 rounded-xl font-bold text-xs tracking-wider flex items-center justify-center gap-2 hover:bg-black/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed uppercase"
+                            disabled={!headline || !details || duration === 0 || duration > 7}
+                            className={`w-full text-white px-8 py-3.5 rounded-xl font-bold text-xs tracking-wider flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed uppercase ${duration > 7 ? 'bg-orange-500 hover:bg-orange-600' : 'bg-black hover:bg-black/90'}`}
                         >
-                            <Zap className="w-4 h-4 fill-white text-white" /> Broadcast to Network
+                            {duration === 0 ? (
+                                <>Select Duration to Broadcast</>
+                            ) : duration > 7 ? (
+                                <><Zap className="w-4 h-4 fill-white text-white" /> Upgrade to Pro to Broadcast</>
+                            ) : (
+                                <><Zap className="w-4 h-4 fill-white text-white" /> Broadcast to Network</>
+                            )}
                         </button>
                     </div>
                 </motion.div>

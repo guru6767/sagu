@@ -5,6 +5,7 @@ import { Plus, Search, Filter, Edit3, Trash2, ArrowUpRight } from 'lucide-react'
 import { useSignalStore } from '@/store/useSignalStore'
 import { useOnboardingStore } from '@/store/useOnboardingStore'
 import RaiseSignalModal from '@/components/feed/RaiseSignalModal'
+import InsightsModal from '@/components/feed/InsightsModal'
 import { useState } from 'react'
 
 export default function MySignals() {
@@ -12,6 +13,7 @@ export default function MySignals() {
     const { username } = useOnboardingStore()
     const [isRaiseModalOpen, setIsRaiseModalOpen] = useState(false)
     const [editingSignal, setEditingSignal] = useState<any>(null)
+    const [viewingInsightsSignal, setViewingInsightsSignal] = useState<any>(null)
     const [activeFilter, setActiveFilter] = useState<string | null>(null)
     
     const categories = ['Talent', 'Founder', 'Mentor', 'Instant Help']
@@ -98,7 +100,7 @@ export default function MySignals() {
                                             <p className="font-mono text-sm">{signal.stats.views}</p>
                                         </div>
                                     </div>
-                                    <button className="text-primary text-sm font-medium flex items-center gap-1 hover:underline">
+                                    <button onClick={() => setViewingInsightsSignal(signal)} className="text-primary text-sm font-medium flex items-center gap-1 hover:underline">
                                         View Detail <ArrowUpRight className="w-4 h-4" />
                                     </button>
                                 </div>
@@ -135,6 +137,14 @@ export default function MySignals() {
                 }} 
                 editSignal={editingSignal}
             />
+            {viewingInsightsSignal && (
+                <InsightsModal 
+                    isOpen={!!viewingInsightsSignal} 
+                    onClose={() => setViewingInsightsSignal(null)} 
+                    stats={viewingInsightsSignal.stats}
+                    signalTitle={viewingInsightsSignal.title}
+                />
+            )}
         </div>
     )
 }

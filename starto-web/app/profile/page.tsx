@@ -68,7 +68,8 @@ export default function UserProfile() {
         twitter,
         github,
         avatarUrl,
-        coverUrl
+        coverUrl,
+        handleBase: username ? username.split('_').slice(0, -1).join('_') : name.split(' ')[0].toLowerCase()
     })
 
     const fileInputRef = useRef<HTMLInputElement>(null)
@@ -94,12 +95,19 @@ export default function UserProfile() {
     }
 
     const handleSave = () => {
-        setProfile(editForm)
-        setIsEditing(false)
+        const formattedRole = editForm.role.toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+        const formattedBase = editForm.handleBase.toLowerCase().trim().replace(/\s+/g, '_').replace(/[^a-z0-9_]+/g, '');
+        const newUsername = `${formattedBase}_${formattedRole}`;
+        
+        setProfile({
+            ...editForm,
+            username: newUsername
+        });
+        setIsEditing(false);
     }
 
     const handleCancel = () => {
-        setEditForm({ name, role, city, bio, website, linkedin, twitter, github, avatarUrl, coverUrl })
+        setEditForm({ name, role, city, bio, website, linkedin, twitter, github, avatarUrl, coverUrl, handleBase: username ? username.split('_').slice(0, -1).join('_') : name.split(' ')[0].toLowerCase() })
         setIsEditing(false)
     }
 
@@ -209,12 +217,23 @@ export default function UserProfile() {
                                                     className="w-full bg-surface-1 border border-border p-2 rounded-md font-display text-xl focus:ring-1 focus:ring-primary outline-none"
                                                 />
                                             </div>
+                                        </div>
+                                        <div className="flex gap-4">
                                             <div className="flex-1">
                                                 <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted mb-1 block">Role</label>
                                                 <input
                                                     value={editForm.role}
                                                     onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
                                                     className="w-full bg-surface-1 border border-border p-2 rounded-md font-medium text-sm focus:ring-1 focus:ring-primary outline-none"
+                                                />
+                                            </div>
+                                            <div className="flex-1">
+                                                <label className="text-[10px] font-bold uppercase tracking-widest text-primary mb-1 block">Custom User Handle</label>
+                                                <input
+                                                    value={editForm.handleBase}
+                                                    onChange={(e) => setEditForm({ ...editForm, handleBase: e.target.value })}
+                                                    placeholder="guru hugar"
+                                                    className="w-full bg-surface-1 border border-primary/30 p-2 rounded-md font-mono text-sm focus:ring-1 focus:ring-primary outline-none"
                                                 />
                                             </div>
                                         </div>

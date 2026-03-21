@@ -1,6 +1,6 @@
 "use client"
 
-import { MessageSquare, Zap, UserPlus, MoreHorizontal, Edit3, Trash2, CheckCheck } from 'lucide-react'
+import { MessageSquare, Zap, UserPlus, MoreHorizontal, Edit3, Trash2, CheckCheck, BarChart2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -10,6 +10,8 @@ import { useOnboardingStore } from '@/store/useOnboardingStore'
 import { useNetworkStore } from '@/store/useNetworkStore'
 import { useResponseStore } from '@/store/useResponseStore'
 import RaiseSignalModal from './RaiseSignalModal'
+import InsightsModal from './InsightsModal'
+import HelpModal from './HelpModal'
 
 interface SignalCardProps {
     id: string
@@ -33,6 +35,10 @@ export default function SignalCard({ id, title, username, timeAgo, category, des
     const { addResponse, hasResponded } = useResponseStore()
     const [showDropdown, setShowDropdown] = useState(false)
     const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+    const [isInsightsModalOpen, setIsInsightsModalOpen] = useState(false)
+    const [isHelpModalOpen, setIsHelpModalOpen] = useState(false)
+    const [showComments, setShowComments] = useState(false)
+    const [commentText, setCommentText] = useState('')
     const [addedToNetwork, setAddedToNetwork] = useState(false)
     const [justResponded, setJustResponded] = useState(false)
     const dropdownRef = useRef<HTMLDivElement>(null)
@@ -49,9 +55,15 @@ export default function SignalCard({ id, title, username, timeAgo, category, des
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [])
-    
-    const isOwner = username === (currentUser || 'krish_startup')
+    const isOwner = currentUser === username
     const currentSignal = signals.find(s => s.id === id)
+
+    // Days left calculation
+    const totalDuration = parseInt(strength) || 7;
+    // Determine creation time, defaulting to 1 day ago if legacy signal created before this feature
+    const safeCreatedAt = currentSignal?.createdAt || (Date.now() - (1000 * 60 * 60 * 24));
+    const daysElapsed = Math.floor((Date.now() - safeCreatedAt) / (1000 * 60 * 60 * 24));
+    const daysLeft = Math.max(0, totalDuration - daysElapsed);
     const strengthColor: Record<string, string> = {
         Normal: 'bg-accent-blue',
         High: 'bg-accent-yellow',
@@ -99,6 +111,12 @@ export default function SignalCard({ id, title, username, timeAgo, category, des
                                         className="absolute right-0 top-full mt-1 w-40 bg-white border border-border rounded-lg shadow-lg z-20 py-1 flex flex-col overflow-hidden"
                                     >
                                         <button 
+                                            onClick={() => { setIsInsightsModalOpen(true); setShowDropdown(false); }}
+                                            className="px-4 py-2.5 text-sm text-left hover:bg-surface-2 transition-colors w-full flex items-center gap-2 text-text-secondary hover:text-black font-medium"
+                                        >
+                                            <BarChart2 className="w-4 h-4" /> Insights
+                                        </button>
+                                        <button 
                                             onClick={() => { setIsEditModalOpen(true); setShowDropdown(false); }}
                                             className="px-4 py-2.5 text-sm text-left hover:bg-surface-2 transition-colors w-full flex items-center gap-2 text-text-secondary hover:text-black font-medium"
                                         >
@@ -138,36 +156,48 @@ export default function SignalCard({ id, title, username, timeAgo, category, des
                     <span className="text-[10px] text-text-muted uppercase">Views</span>
                     <span className="font-mono text-sm">{stats.views}</span>
                 </div>
-                <div className="flex-1 h-1 bg-surface-2 rounded-full overflow-hidden self-end mb-1">
-                    <div className={`h-full ${colorClass} w-3/4`} />
+            </div>
+            
+            {/* Urgency Progress Bar */}
+            <div className="mb-5 relative">
+                <div className="w-full h-1.5 bg-surface-2 overflow-hidden mb-1 flex">
+                    <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `${Math.min(100, Math.max(0, (daysLeft / totalDuration) * 100))}%` }}
+                        transition={{ duration: 1, delay: 0.2, ease: "easeOut" }}
+                        className={`h-full rounded-r-md transition-colors ${
+                            daysLeft <= 3 ? "bg-red-500" :
+                            daysLeft >= totalDuration - 2 ? "bg-green-500" :
+                            "bg-gradient-to-r from-yellow-400 to-orange-500"
+                        }`}
+                    />
                 </div>
+                <div className={`text-[10px] uppercase tracking-widest font-bold float-right ${
+                    daysLeft <= 3 ? "text-red-500" :
+                    daysLeft >= totalDuration - 2 ? "text-green-600" :
+                    "text-orange-500"
+                }`}>
+                    {daysLeft} Days Left
+                </div>
+                <div className="clear-both" />
             </div>
 
+            {/* Actions */}
+
             <div className="flex gap-2">
-                <button className="flex-1 bg-primary text-white py-2.5 rounded-md text-sm font-medium flex items-center justify-center gap-2 hover:opacity-90">
-                    <Zap className="w-4 h-4" /> Help
+                <button onClick={() => setIsHelpModalOpen(true)} className="flex-1 bg-primary text-white py-2.5 rounded-md text-sm font-medium flex items-center justify-center gap-2 hover:opacity-90 transition-all">
+                    <Zap className="w-4 h-4 fill-white" /> Help
                 </button>
                 <button
-                    onClick={() => {
-                        if (!isOwner && !alreadyResponded && !justResponded) {
-                            addResponse({
-                                signalId: id,
-                                signalTitle: title,
-                                signalUsername: username,
-                                signalCategory: category,
-                            });
-                            setJustResponded(true);
-                            setTimeout(() => setJustResponded(false), 3000);
-                        }
-                    }}
+                    onClick={() => setShowComments(!showComments)}
                     className={`flex-1 border py-2.5 rounded-md text-sm font-medium flex items-center justify-center gap-2 transition-all ${
-                        alreadyResponded || justResponded
-                            ? 'border-green-400 bg-green-50 text-green-600'
+                        showComments
+                            ? 'border-black bg-black text-white'
                             : 'border-border hover:bg-surface-2'
                     }`}
                 >
                     <MessageSquare className="w-4 h-4" />
-                    {justResponded ? 'Responded!' : alreadyResponded ? '✓ Responded' : 'Respond'}
+                    Respond
                 </button>
                 <button
                     onClick={() => {
@@ -201,6 +231,79 @@ export default function SignalCard({ id, title, username, timeAgo, category, des
                 </button>
             </div>
             
+            {/* Instagram Style Comments Section */}
+            <AnimatePresence>
+                {showComments && (
+                    <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="mt-4 pt-4 border-t border-border overflow-hidden"
+                    >
+                        <div className="space-y-3 max-h-60 overflow-y-auto pr-2" style={{ scrollbarWidth: 'thin' }}>
+                            {(currentSignal?.comments || []).length === 0 ? (
+                                <p className="text-center text-xs text-text-muted py-4">No responses yet. Be the first to respond!</p>
+                            ) : (
+                                (currentSignal?.comments || []).map(comment => (
+                                    <div key={comment.id} className="flex gap-3 text-sm">
+                                        <div className="w-6 h-6 rounded-full bg-surface-2 overflow-hidden shrink-0 mt-0.5 relative">
+                                            <Image src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${comment.username}`} alt={comment.username} fill className="object-cover" />
+                                        </div>
+                                        <div>
+                                            <p>
+                                                <span className="font-bold mr-2 text-black cursor-pointer hover:underline">@{comment.username}</span>
+                                                <span className="text-text-secondary">{comment.text}</span>
+                                            </p>
+                                            <p className="text-[10px] text-text-muted mt-0.5">
+                                                {new Date(comment.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                                            </p>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+
+                        {/* Comment Input */}
+                        <div className="mt-4 flex gap-2 items-center border-t border-border pt-3">
+                            <div className="w-8 h-8 rounded-full bg-surface-2 overflow-hidden shrink-0 relative">
+                                <Image src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser || 'krish'}`} alt="me" fill className="object-cover" />
+                            </div>
+                            <input
+                                type="text"
+                                placeholder="Add a comment..."
+                                className="flex-1 bg-transparent border-none outline-none text-sm placeholder:text-text-muted ml-2"
+                                value={commentText}
+                                onChange={(e) => setCommentText(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && commentText.trim()) {
+                                        useSignalStore.getState().addComment(id, commentText.trim(), currentUser || 'krish_startup')
+                                        setCommentText('')
+                                        if (!alreadyResponded && !isOwner) {
+                                            addResponse({ signalId: id, signalTitle: title, signalUsername: username, signalCategory: category })
+                                        }
+                                    }
+                                }}
+                            />
+                            <button 
+                                disabled={!commentText.trim()}
+                                onClick={() => {
+                                    if (commentText.trim()) {
+                                        useSignalStore.getState().addComment(id, commentText.trim(), currentUser || 'krish_startup')
+                                        setCommentText('')
+                                        if (!alreadyResponded && !isOwner) {
+                                            addResponse({ signalId: id, signalTitle: title, signalUsername: username, signalCategory: category })
+                                        }
+                                    }
+                                }}
+                                className="text-primary font-bold text-sm disabled:opacity-50 transition-opacity"
+                            >
+                                Post
+                            </button>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+            
             {currentSignal && (
                 <RaiseSignalModal 
                     isOpen={isEditModalOpen} 
@@ -208,6 +311,20 @@ export default function SignalCard({ id, title, username, timeAgo, category, des
                     editSignal={currentSignal} 
                 />
             )}
+            {currentSignal && (
+                <InsightsModal 
+                    isOpen={isInsightsModalOpen} 
+                    onClose={() => setIsInsightsModalOpen(false)} 
+                    stats={stats}
+                    signalTitle={title}
+                />
+            )}
+            <HelpModal 
+                isOpen={isHelpModalOpen} 
+                onClose={() => setIsHelpModalOpen(false)} 
+                signalId={id} 
+                signalTitle={title} 
+            />
         </motion.div>
     )
 }
