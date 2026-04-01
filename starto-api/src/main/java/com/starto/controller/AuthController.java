@@ -16,7 +16,7 @@ public class AuthController {
 
     @PostMapping("/register")
     public ResponseEntity<User> register(@AuthenticationPrincipal String firebaseUid, @RequestBody User userDetails) {
-        User user = userService.createOrUpdateUser(firebaseUid, userDetails.getEmail(), userDetails.getName());
+        User user = userService.createOrUpdateUser(firebaseUid, userDetails);
         return ResponseEntity.ok(user);
     }
 

@@ -11,8 +11,8 @@ export default function LandingPage() {
             <nav className="fixed top-0 w-full z-50 px-6 py-8 flex justify-between items-center bg-[#0A0A0A]/80 backdrop-blur-md">
                 <div className="text-xl font-bold tracking-tighter">STARTO V2</div>
                 <div className="flex gap-8 text-sm font-medium items-center">
-                    <Link href="/onboarding/step1" className="hover:text-gray-400 transition-colors">LOGIN</Link>
-                    <Link href="/onboarding/step1" className="bg-white text-black px-6 py-2 rounded-full font-bold hover:bg-gray-200 transition-all transform hover:scale-105">
+                    <Link href="/feed" className="hover:text-gray-400 transition-colors">LOGIN</Link>
+                    <Link href="/feed" className="bg-white text-black px-6 py-2 rounded-full font-bold hover:bg-gray-200 transition-all transform hover:scale-105">
                         GET STARTED
                     </Link>
                 </div>
@@ -39,7 +39,7 @@ export default function LandingPage() {
                             Build connections, get instant help, and access market intelligence without the noise.
                         </p>
                         <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-                            <Link href="/onboarding/step1" className="group relative bg-white text-black px-12 py-5 rounded-xl font-bold text-lg flex items-center gap-3 overflow-hidden transition-all hover:scale-105 active:scale-95">
+                            <Link href="/feed" className="group relative bg-white text-black px-12 py-5 rounded-xl font-bold text-lg flex items-center gap-3 overflow-hidden transition-all hover:scale-105 active:scale-95">
                                 <span className="relative z-10 transition-colors group-hover:text-black">Enter Ecosystem</span>
                                 <ArrowRight className="w-5 h-5 relative z-10 group-hover:translate-x-1 transition-transform" />
                             </Link>

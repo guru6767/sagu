@@ -14,6 +14,7 @@ interface ResponseState {
     responses: Response[];
     addResponse: (r: Omit<Response, 'id' | 'respondedAt'>) => void;
     hasResponded: (signalId: string) => boolean;
+    clearAll: () => void;
 }
 
 export const useResponseStore = create<ResponseState>()(
@@ -31,6 +32,7 @@ export const useResponseStore = create<ResponseState>()(
                 }
             }),
             hasResponded: (signalId) => get().responses.some(r => r.signalId === signalId),
+            clearAll: () => set({ responses: [] }),
         }),
         {
             name: 'starto-response-storage',

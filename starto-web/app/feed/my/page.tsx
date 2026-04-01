@@ -3,27 +3,37 @@
 import Sidebar from '@/components/feed/Sidebar'
 import { Plus, Search, Filter, Edit3, Trash2, ArrowUpRight } from 'lucide-react'
 import { useSignalStore } from '@/store/useSignalStore'
-import { useOnboardingStore } from '@/store/useOnboardingStore'
+import { useAuthStore } from '@/store/useAuthStore'
 import RaiseSignalModal from '@/components/feed/RaiseSignalModal'
 import InsightsModal from '@/components/feed/InsightsModal'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 
 export default function MySignals() {
+    const router = useRouter()
     const { signals, deleteSignal } = useSignalStore()
-    const { username } = useOnboardingStore()
+    const { user, isAuthenticated } = useAuthStore()
     const [isRaiseModalOpen, setIsRaiseModalOpen] = useState(false)
     const [editingSignal, setEditingSignal] = useState<any>(null)
     const [viewingInsightsSignal, setViewingInsightsSignal] = useState<any>(null)
     const [activeFilter, setActiveFilter] = useState<string | null>(null)
     
+    useEffect(() => {
+        if (!isAuthenticated) {
+            router.push('/auth')
+        }
+    }, [isAuthenticated, router])
+
     const categories = ['Talent', 'Founder', 'Mentor', 'Instant Help']
     
     // Filter signals by logged in user and active category filter
     const mySignals = signals.filter(s => {
-        const isUserMatch = s.username === (username || 'krish_startup')
+        const isUserMatch = s.username === user?.username
         const isCategoryMatch = activeFilter ? s.category === activeFilter : true
         return isUserMatch && isCategoryMatch
     })
+
+    if (!isAuthenticated || !user) return <div className="min-h-screen bg-background flex justify-center items-center text-text-muted">Loading...</div>;
 
     return (
         <div className="min-h-screen bg-background flex justify-center">

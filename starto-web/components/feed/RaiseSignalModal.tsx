@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Zap } from 'lucide-react'
-import { useOnboardingStore } from '@/store/useOnboardingStore'
 import { useSignalStore, Signal } from '@/store/useSignalStore'
+import { useAuthStore } from '@/store/useAuthStore'
+import { useRouter } from 'next/navigation'
 
 interface RaiseSignalModalProps {
     isOpen: boolean;
@@ -13,8 +14,9 @@ interface RaiseSignalModalProps {
 }
 
 export default function RaiseSignalModal({ isOpen, onClose, editSignal }: RaiseSignalModalProps) {
-    const { username, name, role } = useOnboardingStore();
+    const { user } = useAuthStore();
     const { addSignal } = useSignalStore();
+    const router = useRouter();
     
     const [signalType, setSignalType] = useState<'need' | 'help'>('need');
     const [category, setCategory] = useState('Talent');
@@ -44,7 +46,15 @@ export default function RaiseSignalModal({ isOpen, onClose, editSignal }: RaiseS
 
     const handleBroadcast = () => {
         if (!headline || !details || duration === 0) return;
+        if (duration > 7) {
+            // Redirect to upgrade page
+            onClose();
+            router.push('/subscription');
+            return;
+        }
         
+        const currentUsername = user?.username || 'user';
+
         if (editSignal) {
             useSignalStore.getState().updateSignal(editSignal.id, {
                 title: headline,
@@ -54,30 +64,9 @@ export default function RaiseSignalModal({ isOpen, onClose, editSignal }: RaiseS
                 type: signalType
             });
         } else {
-            const currentUsername = useOnboardingStore.getState().username || 'user_startup';
-            const roleMatch = currentUsername.match(/_([^_]+)$/);
-            const roleSuffix = roleMatch ? roleMatch[0] : '_member';
-            const basePart = currentUsername.replace(new RegExp(roleSuffix + '$'), '');
-            const expectedBase = currentUsername;
-
-            // Always regenerate unique checks from current store username so profile changes are reflected
-            const existingSignals = useSignalStore.getState().signals;
-            let finalUsername = expectedBase;
-            let counter = 1;
-            
-            // Ensure uniqueness — skip signals owned by the same user (they can have multiple signals)
-            const usernamesByOthers = existingSignals.filter(s => s.username !== useOnboardingStore.getState().username);
-            while (usernamesByOthers.some(s => s.username === finalUsername)) {
-                finalUsername = `${basePart}${counter}${roleSuffix}`;
-                counter++;
-            }
-            
-            // Save the freshly generated username to the store so ownership checks work
-            useOnboardingStore.getState().setProfile({ username: finalUsername });
-
             addSignal({
                 title: headline,
-                username: finalUsername,
+                username: currentUsername,
                 timeAgo: 'Just now',
                 category: category,
                 description: details,
@@ -196,13 +185,13 @@ export default function RaiseSignalModal({ isOpen, onClose, editSignal }: RaiseS
                     <div className="p-6">
                         <button 
                             onClick={handleBroadcast}
-                            disabled={!headline || !details || duration === 0 || duration > 7}
+                            disabled={!headline || !details || duration === 0}
                             className={`w-full text-white px-8 py-3.5 rounded-xl font-bold text-xs tracking-wider flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed uppercase ${duration > 7 ? 'bg-orange-500 hover:bg-orange-600' : 'bg-black hover:bg-black/90'}`}
                         >
                             {duration === 0 ? (
                                 <>Select Duration to Broadcast</>
                             ) : duration > 7 ? (
-                                <><Zap className="w-4 h-4 fill-white text-white" /> Upgrade to Pro to Broadcast</>
+                                <><Zap className="w-4 h-4 fill-white text-white" /> Upgrade to Pro → Subscription</>
                             ) : (
                                 <><Zap className="w-4 h-4 fill-white text-white" /> Broadcast to Network</>
                             )}

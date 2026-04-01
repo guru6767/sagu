@@ -135,31 +135,44 @@ export default function InsightsModal({ isOpen, onClose, stats, signalTitle }: I
                             </section>
 
                             {/* Interaction Stats */}
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-3 gap-3">
                                 <motion.div 
                                     initial={{ opacity: 0, scale: 0.95 }}
                                     animate={{ opacity: 1, scale: 1 }}
                                     transition={{ delay: 0.4 }}
-                                    className="bg-surface-1 p-5 rounded-3xl flex flex-col items-start shadow-sm border border-border/50"
+                                    className="bg-surface-1 p-4 rounded-3xl flex flex-col items-start shadow-sm border border-border/50"
                                 >
-                                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center mb-3">
+                                    <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center mb-2">
                                         <MessageSquare className="w-4 h-4 text-primary" />
                                     </div>
-                                    <span className="text-3xl font-light tracking-tighter text-black mb-1">{stats.responses}</span>
-                                    <span className="text-[11px] text-text-muted uppercase tracking-widest font-bold">Responses</span>
+                                    <span className="text-2xl font-light tracking-tighter text-black mb-0.5">{stats.responses}</span>
+                                    <span className="text-[10px] text-text-muted uppercase tracking-widest font-bold">Responses</span>
                                 </motion.div>
 
                                 <motion.div 
                                     initial={{ opacity: 0, scale: 0.95 }}
                                     animate={{ opacity: 1, scale: 1 }}
                                     transition={{ delay: 0.5 }}
-                                    className="bg-surface-1 p-5 rounded-3xl flex flex-col items-start shadow-sm border border-border/50"
+                                    className="bg-surface-1 p-4 rounded-3xl flex flex-col items-start shadow-sm border border-border/50"
                                 >
-                                    <div className="w-10 h-10 rounded-full bg-accent-blue/10 flex items-center justify-center mb-3">
+                                    <div className="w-9 h-9 rounded-full bg-accent-blue/10 flex items-center justify-center mb-2">
                                         <Zap className="w-4 h-4 text-accent-blue" />
                                     </div>
-                                    <span className="text-3xl font-light tracking-tighter text-black mb-1">{stats.offers}</span>
-                                    <span className="text-[11px] text-text-muted uppercase tracking-widest font-bold">Help Offers</span>
+                                    <span className="text-2xl font-light tracking-tighter text-black mb-0.5">{stats.offers}</span>
+                                    <span className="text-[10px] text-text-muted uppercase tracking-widest font-bold">Help Offers</span>
+                                </motion.div>
+
+                                <motion.div 
+                                    initial={{ opacity: 0, scale: 0.95 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    transition={{ delay: 0.6 }}
+                                    className="bg-surface-1 p-4 rounded-3xl flex flex-col items-start shadow-sm border border-border/50"
+                                >
+                                    <div className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center mb-2">
+                                        <Eye className="w-4 h-4 text-green-600" />
+                                    </div>
+                                    <span className="text-2xl font-light tracking-tighter text-black mb-0.5">{stats.views}</span>
+                                    <span className="text-[10px] text-text-muted uppercase tracking-widest font-bold">Total Views</span>
                                 </motion.div>
                             </div>
 

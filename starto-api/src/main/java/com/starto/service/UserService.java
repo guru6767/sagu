@@ -20,7 +20,7 @@ public class UserService {
     }
 
     @Transactional
-    public User createOrUpdateUser(String firebaseUid, String email, String name) {
+    public User createOrUpdateUser(String firebaseUid, User userDetails) {
         return userRepository.findByFirebaseUid(firebaseUid)
                 .map(user -> {
                     user.setLastSeen(OffsetDateTime.now());
@@ -30,9 +30,15 @@ public class UserService {
                 .orElseGet(() -> {
                     User newUser = User.builder()
                             .firebaseUid(firebaseUid)
-                            .email(email)
-                            .name(name)
-                            .role("Founder") // Default role, should be updated in onboarding
+                            .email(userDetails.getEmail())
+                            .name(userDetails.getName())
+                            .role(userDetails.getRole() != null ? userDetails.getRole() : "Founder")
+                            .phone(userDetails.getPhone())
+                            .bio(userDetails.getBio())
+                            .city(userDetails.getCity())
+                            .state(userDetails.getState())
+                            .lat(userDetails.getLat())
+                            .lng(userDetails.getLng())
                             .plan("free")
                             .lastSeen(OffsetDateTime.now())
                             .isOnline(true)

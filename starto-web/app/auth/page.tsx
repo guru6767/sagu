@@ -1,0 +1,289 @@
+"use client"
+import { useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Mail, AlertCircle, ArrowRight, CheckCircle } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { useAuthStore } from '@/store/useAuthStore'
+import { useLocalUserStore } from '@/store/useLocalUserStore'
+import { useSignalStore } from '@/store/useSignalStore'
+
+type AuthMode = 'login' | 'signup' | 'onboarding'
+
+const ROLES = ['Founder', 'Talent', 'Mentor', 'Startup']
+
+export default function AuthPage() {
+    const router = useRouter()
+    const { setAuth } = useAuthStore()
+    const { registerUser, loginUser, getAllUsernames, updateUserRecord } = useLocalUserStore()
+
+    const [mode, setMode] = useState<AuthMode>('login')
+
+    // Shared fields
+    const [email, setEmail] = useState('')
+    const [password, setPassword] = useState('')
+    const [error, setError] = useState('')
+    const [loading, setLoading] = useState(false)
+    const [signupSuccess, setSignupSuccess] = useState(false)
+
+    // Sign-up extra fields
+    const [name, setName] = useState('')
+    const [role, setRole] = useState('')
+    const [bio, setBio] = useState('')
+    const [city, setCity] = useState('')
+    const [phone, setPhone] = useState('')
+
+    const switchMode = (m: AuthMode) => {
+        setMode(m)
+        setError('')
+        setSignupSuccess(false)
+        setEmail('')
+        setPassword('')
+        setName('')
+        setBio('')
+        setCity('')
+        setPhone('')
+    }
+
+    // ──────────── LOGIN ────────────
+
+    // Builds canonical username from name+role: firstname_lastname_role
+    const buildCanonicalUsername = (name: string, role: string) => {
+        const nameParts = name.trim().split(/\s+/)
+        const firstName = nameParts[0].toLowerCase().replace(/[^a-z0-9]/g, '')
+        const lastName = nameParts.length > 1 ? nameParts.slice(1).join('_').toLowerCase().replace(/[^a-z0-9_]/g, '') : ''
+        const roleSlug = role.toLowerCase().replace(/[^a-z0-9]/g, '')
+        const base = lastName ? `${firstName}_${lastName}` : firstName
+        return { base, roleSlug, canonical: `${base}_${roleSlug}` }
+    }
+
+    // On every login: ensure username is in correct format.
+    // Only keeps stored username if user already customized it (handle differs from auto-gen).
+    const ensureFormattedUsername = (u: { name: string; role: string; username: string; email: string }) => {
+        const { base, roleSlug, canonical } = buildCanonicalUsername(u.name, u.role)
+
+        // Already exactly correct → nothing to do
+        if (u.username === canonical) return { username: u.username, changed: false }
+
+        // Check if user customized the handle (e.g. sagar_g88_talent or krishna_k88_founder)
+        const storedParts = u.username.split('_').filter(Boolean)
+        const storedRole = storedParts[storedParts.length - 1]?.toLowerCase() || ''
+        const storedHandle = storedParts.slice(0, -1).join('_')
+        const isCustomized = storedRole === roleSlug && storedHandle !== base && storedHandle.length > 0
+        if (isCustomized) return { username: u.username, changed: false }
+
+        // Auto-migrate: username is old-format → rebuild from name+role
+        updateUserRecord(u.email, { username: canonical })
+        return { username: canonical, changed: true, oldUsername: u.username }
+    }
+
+    const handleLogin = async (e: React.FormEvent) => {
+        e.preventDefault()
+        setLoading(true)
+        setError('')
+        try {
+            const result = loginUser(email.trim(), password)
+            if (!result.success || !result.user) {
+                setError(result.error || 'Invalid credentials.')
+                return
+            }
+
+            const u = result.user
+            const migration = ensureFormattedUsername(u)
+            const username = migration.username
+
+            // Also rename all existing signals/comments that used the old username
+            if (migration.changed && migration.oldUsername) {
+                useSignalStore.getState().migrateUsername(migration.oldUsername, username)
+            }
+
+            const mockUserData = {
+                id: `local-${username}`,
+                firebaseUid: `local-${username}`,
+                username,
+                name: u.name,
+                email: u.email,
+                phone: u.phone,
+                role: u.role,
+                industry: '',
+                city: u.city,
+                state: '',
+                bio: u.bio,
+                avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.avatarSeed}`,
+                plan: 'Free',
+                signalCount: 0,
+                networkSize: 0,
+            }
+            setAuth({ email: u.email, displayName: u.name, getIdToken: async () => `local-${username}` } as any, `local-${username}`, mockUserData)
+            router.push('/feed')
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    // ──────────── SIGN UP ────────────
+    const handleSignup = async (e: React.FormEvent) => {
+        e.preventDefault()
+        setLoading(true)
+        setError('')
+        try {
+            if (!name.trim() || !email.trim() || !password || !role || !city.trim() || !phone.trim()) {
+                setError('Please fill all required fields.')
+                return
+            }
+            if (password.length < 8) {
+                setError('Password must be at least 8 characters.')
+                return
+            }
+
+            // Generate username using same logic as login migration
+            const { base: baseHandle, roleSlug, canonical } = buildCanonicalUsername(name, role)
+            const existingUsernames = getAllUsernames()
+
+            // Auto-increment if taken: sagar_g_talent → sagar_g1_talent → sagar_g2_talent
+            let username = canonical
+            if (existingUsernames.includes(username)) {
+                let counter = 1
+                while (existingUsernames.includes(`${baseHandle}${counter}_${roleSlug}`)) {
+                    counter++
+                }
+                username = `${baseHandle}${counter}_${roleSlug}`
+            }
+
+            const avatarSeed = username + Date.now()
+
+            const result = registerUser({ email: email.trim(), password, name: name.trim(), role, bio, city, phone, username, avatarSeed })
+            if (!result.success) {
+                setError(result.error || 'Registration failed.')
+                return
+            }
+
+            setSignupSuccess(true)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    return (
+        <div className="min-h-screen bg-[#0A0A0A] flex flex-col items-center justify-center p-6 text-white text-center selection:bg-white selection:text-black">
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="max-w-md w-full bg-white/[0.02] border border-white/5 p-8 rounded-2xl shadow-xl"
+            >
+                <h1 className="text-4xl font-bold mb-2 tracking-tight">Starto</h1>
+                <p className="text-gray-400 mb-8 text-sm">Where Ecosystems Connect.</p>
+
+                {/* Tabs */}
+                <div className="flex border-b border-white/10 mb-8">
+                    <button
+                        onClick={() => switchMode('login')}
+                        className={`flex-1 pb-4 text-sm font-medium transition-colors ${mode === 'login' ? 'text-white border-b-2 border-white' : 'text-gray-500 hover:text-gray-300'}`}
+                    >
+                        Login
+                    </button>
+                    <button
+                        onClick={() => switchMode('signup')}
+                        className={`flex-1 pb-4 text-sm font-medium transition-colors ${mode === 'signup' ? 'text-white border-b-2 border-white' : 'text-gray-500 hover:text-gray-300'}`}
+                    >
+                        Sign Up
+                    </button>
+                </div>
+
+                <AnimatePresence mode="wait">
+                    {/* ──── LOGIN ──── */}
+                    {mode === 'login' && (
+                        <motion.div key="login" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-4 text-left">
+                            {signupSuccess && (
+                                <div className="flex items-start gap-2 p-3 bg-green-500/10 border border-green-500/20 rounded-lg mb-2">
+                                    <CheckCircle className="w-4 h-4 text-green-400 mt-0.5 shrink-0" />
+                                    <p className="text-xs text-green-300 leading-relaxed">Account created! Please login with your new credentials.</p>
+                                </div>
+                            )}
+                            <form onSubmit={handleLogin} className="space-y-4">
+                                <div>
+                                    <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">Email</label>
+                                    <input type="email" value={email} onChange={e => setEmail(e.target.value)} required className="w-full mt-2 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-white/40 focus:bg-white/10 transition-colors" />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">Password</label>
+                                    <input type="password" value={password} onChange={e => setPassword(e.target.value)} required className="w-full mt-2 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-white/40 focus:bg-white/10 transition-colors" />
+                                </div>
+                                {error && <p className="text-red-500 text-xs flex items-center gap-1 font-medium"><AlertCircle className="w-3 h-3" /> {error}</p>}
+                                <button disabled={loading} type="submit" className="w-full bg-white text-black py-4 px-6 rounded-xl font-bold flex items-center justify-center gap-3 hover:bg-gray-200 transition-all mt-4 disabled:opacity-50">
+                                    {loading ? 'Logging in...' : 'Login'}
+                                    {!loading && <ArrowRight className="w-4 h-4" />}
+                                </button>
+                            </form>
+                            <p className="text-center text-xs text-gray-500 mt-4">
+                                Don&apos;t have an account?{' '}
+                                <button onClick={() => switchMode('signup')} className="text-gray-300 hover:text-white underline">Sign up</button>
+                            </p>
+                        </motion.div>
+                    )}
+
+                    {/* ──── SIGN UP ──── */}
+                    {mode === 'signup' && !signupSuccess && (
+                        <motion.form key="signup" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onSubmit={handleSignup} className="space-y-4 text-left">
+                            <div>
+                                <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">Full Name <span className="text-red-400">*</span></label>
+                                <input type="text" value={name} onChange={e => setName(e.target.value)} required className="w-full mt-2 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-white/40 focus:bg-white/10 transition-colors" />
+                            </div>
+                            <div>
+                                <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">Role <span className="text-red-400">*</span></label>
+                                <select value={role} onChange={e => setRole(e.target.value)} required className={`w-full mt-2 bg-[#111] border border-white/10 rounded-lg px-4 py-3 outline-none focus:border-white/40 transition-colors appearance-none ${role === '' ? 'text-gray-500' : 'text-white'}`}>
+                                    <option value="" disabled hidden>Select a role</option>
+                                    {ROLES.map(r => <option key={r} value={r} className="text-white">{r}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">Location (City) <span className="text-red-400">*</span></label>
+                                <input type="text" value={city} onChange={e => setCity(e.target.value)} required className="w-full mt-2 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-white/40 focus:bg-white/10 transition-colors" />
+                            </div>
+                            <div>
+                                <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">Mobile Number <span className="text-red-400">*</span></label>
+                                <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} required className="w-full mt-2 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-white/40 focus:bg-white/10 transition-colors" />
+                            </div>
+                            <div>
+                                <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">Bio <span className="text-gray-600">(optional)</span></label>
+                                <textarea value={bio} onChange={e => setBio(e.target.value)} rows={2} className="w-full mt-2 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-white/40 focus:bg-white/10 transition-colors resize-none" />
+                            </div>
+                            <div className="border-t border-white/10 pt-4">
+                                <p className="text-xs text-gray-500 mb-3 font-medium uppercase tracking-wider">Create your credentials</p>
+                                <div>
+                                    <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">Email <span className="text-red-400">*</span></label>
+                                    <input type="email" value={email} onChange={e => setEmail(e.target.value)} required className="w-full mt-2 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-white/40 focus:bg-white/10 transition-colors" />
+                                </div>
+                                <div className="mt-4">
+                                    <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">Password <span className="text-red-400">*</span></label>
+                                    <input type="password" value={password} onChange={e => setPassword(e.target.value)} required className="w-full mt-2 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-white/40 focus:bg-white/10 transition-colors" />
+                                </div>
+                            </div>
+                            {error && <p className="text-red-500 text-xs flex items-center gap-1 font-medium"><AlertCircle className="w-3 h-3" /> {error}</p>}
+                            <button disabled={loading} type="submit" className="w-full bg-white text-black py-4 px-6 rounded-xl font-bold flex items-center justify-center gap-3 hover:bg-gray-200 transition-all mt-4 disabled:opacity-50">
+                                <Mail className="w-5 h-5" />
+                                {loading ? 'Creating account...' : 'Create Account'}
+                            </button>
+                        </motion.form>
+                    )}
+
+                    {/* ──── SUCCESS AFTER SIGNUP ──── */}
+                    {mode === 'signup' && signupSuccess && (
+                        <motion.div key="success" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="text-center space-y-4 py-4">
+                            <div className="w-16 h-16 bg-green-500/10 rounded-full flex items-center justify-center mx-auto">
+                                <CheckCircle className="w-8 h-8 text-green-400" />
+                            </div>
+                            <h2 className="text-xl font-bold text-white">Account Created!</h2>
+                            <p className="text-sm text-gray-400">Your account has been set up. Please login now with the email and password you just created.</p>
+                            <button
+                                onClick={() => { switchMode('login'); setSignupSuccess(true); }}
+                                className="w-full bg-white text-black py-4 px-6 rounded-xl font-bold flex items-center justify-center gap-3 hover:bg-gray-200 transition-all mt-4"
+                            >
+                                Go to Login <ArrowRight className="w-4 h-4" />
+                            </button>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+            </motion.div>
+        </div>
+    )
+}

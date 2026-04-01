@@ -4,7 +4,7 @@ import Sidebar from '@/components/feed/Sidebar'
 import { MapPin, Globe, Twitter, Linkedin, Github, Zap, Users, BadgeCheck, Star } from 'lucide-react'
 import Image from 'next/image'
 import { useState } from 'react'
-import { useOnboardingStore } from '@/store/useOnboardingStore'
+import { useAuthStore } from '@/store/useAuthStore'
 import { useSignalStore } from '@/store/useSignalStore'
 import { useNetworkStore } from '@/store/useNetworkStore'
 import { useRatingStore } from '@/store/useRatingStore'
@@ -13,28 +13,30 @@ import Link from 'next/link'
 export default function PublicProfile({ params }: { params: { username: string } }) {
     const { username: paramUsername } = params
 
-    const formatURL = (url: string) => {
+    const formatURL = (url: string | null | undefined) => {
         if (!url) return '#'
         return url.startsWith('http') ? url : `https://${url}`
     }
 
-    const extractHandle = (url: string, prefix = '@') => {
+    const extractHandle = (url: string | null | undefined, prefix = '@') => {
         if (!url) return ''
         const parts = url.split('/').filter(Boolean)
         const lastPart = parts[parts.length - 1] || ''
         return lastPart.startsWith('@') ? lastPart : `${prefix}${lastPart}`
     }
 
+    const { user, isAuthenticated } = useAuthStore()
+    const storeUsername = user?.username || ''
     const {
-        isVerified, subscription, name, username: storeUsername,
-        role, city, bio, website, linkedin, twitter, github, avatarUrl, coverUrl,
-    } = useOnboardingStore()
+        isVerified = false, subscription = 'Free', name = '',
+        role = '', city = '', bio = '', website = '', linkedin = '', twitter = '', github = '', avatarUrl = null, coverUrl = null,
+    } = user || {}
 
     const { signals } = useSignalStore()
     const { connections } = useNetworkStore()
     const { addRating, getAverageRating, getRatingsFor, hasRated } = useRatingStore()
 
-    const isOwnProfile = paramUsername === storeUsername
+    const isOwnProfile = isAuthenticated && paramUsername === storeUsername
     const userSignals = signals.filter(s => s.username === paramUsername)
 
     const displayName = isOwnProfile ? name : paramUsername.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())

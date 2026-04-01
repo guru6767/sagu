@@ -3,22 +3,28 @@
 import Sidebar from '@/components/feed/Sidebar'
 import { MapPin, Globe, Twitter, Linkedin, Github, Signal, Zap, Camera, Upload, Users, BadgeCheck, Star, Edit3, Check, X, Link as LinkIcon, Clock } from 'lucide-react'
 import Image from 'next/image'
-import { useState, useRef } from 'react'
-import { useOnboardingStore } from '@/store/useOnboardingStore'
+import { useState, useRef, useEffect } from 'react'
+import { useAuthStore } from '@/store/useAuthStore'
 import { useSignalStore } from '@/store/useSignalStore'
 import { useNetworkStore } from '@/store/useNetworkStore'
 import { useRatingStore } from '@/store/useRatingStore'
 import { useResponseStore } from '@/store/useResponseStore'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useRouter } from 'next/navigation'
+import { useLocalUserStore } from '@/store/useLocalUserStore'
 
 export default function UserProfile() {
-    const formatURL = (url: string) => {
+    const router = useRouter()
+    const { user, isAuthenticated, updateUser } = useAuthStore()
+    const { updateUserRecord } = useLocalUserStore()
+
+    const formatURL = (url: string | null | undefined) => {
         if (!url) return '#'
         return url.startsWith('http') ? url : `https://${url}`
     }
 
-    const extractHandle = (url: string, prefix = '@') => {
+    const extractHandle = (url: string | null | undefined, prefix = '@') => {
         if (!url) return ''
         const parts = url.split('/').filter(Boolean)
         const lastPart = parts[parts.length - 1] || ''
@@ -26,21 +32,20 @@ export default function UserProfile() {
     }
 
     const {
-        isVerified,
-        subscription,
-        name,
-        username,
-        role,
-        city,
-        bio,
-        website,
-        linkedin,
-        twitter,
-        github,
-        avatarUrl,
-        coverUrl,
-        setProfile
-    } = useOnboardingStore()
+        isVerified = false,
+        subscription = 'Free',
+        name = '',
+        username = '',
+        role = '',
+        city = '',
+        bio = '',
+        website = '',
+        linkedin = '',
+        twitter = '',
+        github = '',
+        avatarUrl = null,
+        coverUrl = null
+    } = user || {}
 
     const { signals } = useSignalStore()
     const { connections } = useNetworkStore()
@@ -49,7 +54,7 @@ export default function UserProfile() {
 
     const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000
     const mySignals = signals.filter(s => s.username === username)
-    const activeSignals = mySignals.filter(s => s.status === 'Active' && (!s.createdAt || Date.now() - s.createdAt < SEVEN_DAYS))
+    const activeSignals = mySignals.filter(s => s.status === 'Active')
     const pastSignals = mySignals.filter(s => s.status === 'Solved' || (s.createdAt && Date.now() - s.createdAt >= SEVEN_DAYS))
     const avgRating = getAverageRating(username)
     const myRatings = getRatingsFor(username)
@@ -57,6 +62,7 @@ export default function UserProfile() {
 
     const [isEditing, setIsEditing] = useState(false)
     const [isEditingSocial, setIsEditingSocial] = useState(false)
+    
     const [socialForm, setSocialForm] = useState({ linkedin, twitter, github })
     const [editForm, setEditForm] = useState({
         name,
@@ -69,8 +75,35 @@ export default function UserProfile() {
         github,
         avatarUrl,
         coverUrl,
-        handleBase: username ? username.split('_').slice(0, -1).join('_') : name.split(' ')[0].toLowerCase()
+        handleBase: username
+            ? username.split('_').slice(0, -1).join('_')
+            : (name ? name.split(' ')[0].toLowerCase() : '')
     })
+
+    useEffect(() => {
+        if (!isAuthenticated) {
+            router.push('/auth')
+        }
+    }, [isAuthenticated, router])
+
+    useEffect(() => {
+        if (user) {
+            setSocialForm({ linkedin: user.linkedin || '', twitter: user.twitter || '', github: user.github || '' })
+            setEditForm({
+                name: user.name || '',
+                role: user.role || '',
+                city: user.city || '',
+                bio: user.bio || '',
+                website: user.website || '',
+                linkedin: user.linkedin || '',
+                twitter: user.twitter || '',
+                github: user.github || '',
+                avatarUrl: user.avatarUrl || null,
+                coverUrl: user.coverUrl || null,
+                handleBase: user.username ? user.username.split('_').slice(0, -1).join('_') : user.name.split(' ')[0]?.toLowerCase() || ''
+            })
+        }
+    }, [user])
 
     const fileInputRef = useRef<HTMLInputElement>(null)
     const logoInputRef = useRef<HTMLInputElement>(null)
@@ -95,31 +128,48 @@ export default function UserProfile() {
     }
 
     const handleSave = () => {
-        const formattedRole = editForm.role.toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
-        const formattedBase = editForm.handleBase.toLowerCase().trim().replace(/\s+/g, '_').replace(/[^a-z0-9_]+/g, '');
-        const newUsername = `${formattedBase}_${formattedRole}`;
-        
-        setProfile({
-            ...editForm,
-            username: newUsername
-        });
-        setIsEditing(false);
+        const formattedRole = editForm.role.toLowerCase().trim().replace(/[\s/]+/g, '').replace(/[^a-z0-9]+/g, '')
+        const formattedBase = editForm.handleBase.toLowerCase().trim().replace(/\s+/g, '_').replace(/[^a-z0-9_]+/g, '')
+        const newUsername = `${formattedBase}_${formattedRole}`
+
+        updateUser({ ...editForm, username: newUsername })
+        // Keep local user store in sync so signals & login still match
+        if (user?.email) updateUserRecord(user.email, { username: newUsername })
+        setIsEditing(false)
     }
 
     const handleCancel = () => {
-        setEditForm({ name, role, city, bio, website, linkedin, twitter, github, avatarUrl, coverUrl, handleBase: username ? username.split('_').slice(0, -1).join('_') : name.split(' ')[0].toLowerCase() })
+        if (user) {
+            setEditForm({ 
+                name: user.name || '', 
+                role: user.role || '', 
+                city: user.city || '', 
+                bio: user.bio || '', 
+                website: user.website || '', 
+                linkedin: user.linkedin || '', 
+                twitter: user.twitter || '', 
+                github: user.github || '', 
+                avatarUrl: user.avatarUrl || null, 
+                coverUrl: user.coverUrl || null, 
+                handleBase: user.username ? user.username.split('_').slice(0, -1).join('_') : user.name.split(' ')[0]?.toLowerCase() || '' 
+            })
+        }
         setIsEditing(false)
     }
 
     const handleSaveSocial = () => {
-        setProfile({ linkedin: socialForm.linkedin, twitter: socialForm.twitter, github: socialForm.github })
+        updateUser({ linkedin: socialForm.linkedin, twitter: socialForm.twitter, github: socialForm.github })
         setIsEditingSocial(false)
     }
 
     const handleCancelSocial = () => {
-        setSocialForm({ linkedin, twitter, github })
+        if (user) {
+            setSocialForm({ linkedin: user.linkedin || '', twitter: user.twitter || '', github: user.github || '' })
+        }
         setIsEditingSocial(false)
     }
+
+    if (!isAuthenticated || !user) return <div className="min-h-screen bg-background flex justify-center items-center text-text-muted">Loading...</div>;
 
     return (
         <div className="min-h-screen bg-background flex justify-center">
@@ -130,214 +180,101 @@ export default function UserProfile() {
                 <input type="file" ref={logoInputRef} className="hidden" onChange={(e) => onFileChange(e, 'logo')} accept="image/*" />
 
                 <main className="flex-1 max-w-[680px] border-r border-border min-h-screen p-0">
-                    {/* Cover Section */}
-                    <div className="h-48 bg-primary relative overflow-hidden group/banner">
-                        {(isEditing ? editForm.coverUrl : coverUrl) ? (
-                            <Image
-                                src={isEditing ? editForm.coverUrl! : coverUrl!}
-                                alt="Cover"
-                                fill
-                                className="object-cover opacity-20 invert"
-                            />
-                        ) : (
-                            <div className="absolute inset-0 bg-surface-2 flex items-center justify-center">
-                                <Globe className="w-12 h-12 text-text-muted opacity-20" />
-                            </div>
-                        )}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
 
-                        {isEditing && (
-                            <div className="absolute bottom-4 right-4 flex gap-2 transition-all">
-                                <button
-                                    onClick={() => handleUpload('logo')}
-                                    className="bg-white/10 hover:bg-white/20 p-2 rounded-lg text-white backdrop-blur-md flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest"
-                                >
-                                    <Camera className="w-4 h-4" /> Change Cover
-                                </button>
-                                {(isEditing ? editForm.coverUrl : coverUrl) && (
-                                    <button
-                                        onClick={() => handleRemove('logo')}
-                                        className="bg-accent-red/20 hover:bg-accent-red/40 p-2 rounded-lg text-white backdrop-blur-md flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest"
-                                    >
-                                        Remove
-                                    </button>
-                                )}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Profile Picture Section */}
-                    <div className="h-0 relative">
-                        <div className="absolute -top-16 left-8">
-                            <div className="w-32 h-32 bg-white rounded-3xl p-1.5 border-4 border-background shadow-2xl relative group overflow-hidden">
-                                {(isEditing ? editForm.avatarUrl : avatarUrl) ? (
-                                    <Image
-                                        src={isEditing ? editForm.avatarUrl! : avatarUrl!}
-                                        alt="Profile"
-                                        fill
-                                        className="object-cover rounded-2xl"
-                                    />
-                                ) : (
-                                    <div className="w-full h-full bg-surface-2 rounded-2xl flex items-center justify-center">
-                                        <Users className="w-12 h-12 text-text-muted" />
-                                    </div>
-                                )}
-
-                                {isEditing && (
-                                    <div className="absolute inset-0 bg-black/40 transition-opacity flex flex-col items-center justify-center cursor-pointer text-white">
-                                        <div className="flex flex-col items-center gap-2">
-                                            <button onClick={() => handleUpload('profile')} className="flex flex-col items-center hover:scale-110 transition-transform">
-                                                <Upload className="w-6 h-6 mb-1" />
-                                                <span className="text-[10px] font-bold uppercase">Update</span>
-                                            </button>
-                                            {(isEditing ? editForm.avatarUrl : avatarUrl) && (
-                                                <button onClick={() => handleRemove('profile')} className="text-[10px] font-bold uppercase text-accent-red hover:underline mt-2">
-                                                    Remove
-                                                </button>
-                                            )}
+                    {/* ── Clean Profile Header (no cover) ── */}
+                    <div className="px-8 pt-8 pb-6 border-b border-border">
+                        <div className="flex items-start gap-6">
+                            {/* Avatar */}
+                            <div className="relative shrink-0">
+                                <div className="w-24 h-24 bg-white rounded-2xl border-2 border-border shadow-lg relative overflow-hidden">
+                                    {(isEditing ? editForm.avatarUrl : avatarUrl) ? (
+                                        <Image src={isEditing ? editForm.avatarUrl! : avatarUrl!} alt="Profile" fill className="object-cover" />
+                                    ) : (
+                                        <div className="w-full h-full bg-surface-2 flex items-center justify-center">
+                                            <Users className="w-10 h-10 text-text-muted" />
                                         </div>
-                                    </div>
-                                )}
+                                    )}
+                                    {isEditing && (
+                                        <button onClick={() => handleUpload('profile')} className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-white">
+                                            <Camera className="w-5 h-5 mb-1" /><span className="text-[9px] font-bold uppercase">Change</span>
+                                        </button>
+                                    )}
+                                </div>
                             </div>
-                        </div>
-                    </div>
 
-                    {/* Profile Body */}
-                    <div className="px-8 pt-20 pb-8 border-b border-border">
-                        <div className="flex justify-between items-start mb-6">
-                            <div className="flex-1 mr-4">
+                            {/* Name + details */}
+                            <div className="flex-1 min-w-0">
                                 {isEditing ? (
                                     <div className="space-y-4">
-                                        <div className="flex gap-4">
+                                        <div className="flex gap-3">
                                             <div className="flex-1">
                                                 <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted mb-1 block">Full Name</label>
-                                                <input
-                                                    value={editForm.name}
-                                                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                                                    className="w-full bg-surface-1 border border-border p-2 rounded-md font-display text-xl focus:ring-1 focus:ring-primary outline-none"
-                                                />
+                                                <input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} className="w-full bg-surface-1 border border-border p-2 rounded-md font-display text-xl focus:ring-1 focus:ring-primary outline-none" />
                                             </div>
-                                        </div>
-                                        <div className="flex gap-4">
                                             <div className="flex-1">
                                                 <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted mb-1 block">Role</label>
-                                                <input
-                                                    value={editForm.role}
-                                                    onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
-                                                    className="w-full bg-surface-1 border border-border p-2 rounded-md font-medium text-sm focus:ring-1 focus:ring-primary outline-none"
-                                                />
+                                                <input value={editForm.role} onChange={(e) => setEditForm({ ...editForm, role: e.target.value })} className="w-full bg-surface-1 border border-border p-2 rounded-md text-sm focus:ring-1 focus:ring-primary outline-none" />
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-3">
+                                            <div className="flex-1">
+                                                <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted mb-1 block">Location</label>
+                                                <div className="relative"><MapPin className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" /><input value={editForm.city} onChange={(e) => setEditForm({ ...editForm, city: e.target.value })} className="w-full bg-surface-1 border border-border p-2 pl-8 rounded-md text-sm focus:ring-1 focus:ring-primary outline-none" /></div>
                                             </div>
                                             <div className="flex-1">
-                                                <label className="text-[10px] font-bold uppercase tracking-widest text-primary mb-1 block">Custom User Handle</label>
-                                                <input
-                                                    value={editForm.handleBase}
-                                                    onChange={(e) => setEditForm({ ...editForm, handleBase: e.target.value })}
-                                                    placeholder="guru hugar"
-                                                    className="w-full bg-surface-1 border border-primary/30 p-2 rounded-md font-mono text-sm focus:ring-1 focus:ring-primary outline-none"
-                                                />
+                                                <label className="text-[10px] font-bold uppercase tracking-widest text-primary mb-1 block">User Handle (editable)</label>
+                                                <input value={editForm.handleBase} onChange={(e) => setEditForm({ ...editForm, handleBase: e.target.value })} className="w-full bg-surface-1 border border-primary/30 p-2 rounded-md font-mono text-sm focus:ring-1 focus:ring-primary outline-none" placeholder="e.g. krishna_k88" />
+                                                <p className="text-[10px] text-text-muted mt-1 font-mono">
+                                                    Preview: <span className="text-primary font-bold">
+                                                        @{editForm.handleBase.toLowerCase().trim().replace(/\s+/g, '_').replace(/[^a-z0-9_]+/g, '') || '…'}_{editForm.role.toLowerCase().trim().replace(/[\s/]+/g, '').replace(/[^a-z0-9]+/g, '') || 'role'}
+                                                    </span>
+                                                </p>
                                             </div>
                                         </div>
                                         <div>
                                             <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted mb-1 block">Bio</label>
-                                            <textarea
-                                                value={editForm.bio}
-                                                onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })}
-                                                rows={3}
-                                                className="w-full bg-surface-1 border border-border p-2 rounded-md text-sm focus:ring-1 focus:ring-primary outline-none resize-none"
-                                            />
+                                            <textarea value={editForm.bio} onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })} rows={2} className="w-full bg-surface-1 border border-border p-2 rounded-md text-sm focus:ring-1 focus:ring-primary outline-none resize-none" />
                                         </div>
-                                        <div className="flex gap-4">
-                                            <div className="flex-1">
-                                                <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted mb-1 block">Location</label>
-                                                <div className="relative">
-                                                    <MapPin className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
-                                                    <input
-                                                        value={editForm.city}
-                                                        onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
-                                                        className="w-full bg-surface-1 border border-border p-2 pl-8 rounded-md text-sm focus:ring-1 focus:ring-primary outline-none"
-                                                    />
-                                                </div>
-                                            </div>
-                                            <div className="flex-1">
-                                                <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted mb-1 block">Website</label>
-                                                <div className="relative">
-                                                    <Globe className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
-                                                    <input
-                                                        value={editForm.website}
-                                                        onChange={(e) => setEditForm({ ...editForm, website: e.target.value })}
-                                                        className="w-full bg-surface-1 border border-border p-2 pl-8 rounded-md text-sm focus:ring-1 focus:ring-primary outline-none"
-                                                    />
-                                                </div>
-                                            </div>
+                                        <div className="flex gap-3">
+                                            <button onClick={handleSave} className="px-5 py-2 bg-primary text-white rounded-md text-sm font-bold flex items-center gap-2 hover:opacity-90"><Check className="w-4 h-4" /> Save</button>
+                                            <button onClick={handleCancel} className="px-5 py-2 border border-border rounded-md text-sm font-bold flex items-center gap-2 hover:bg-surface-2"><X className="w-4 h-4" /> Cancel</button>
                                         </div>
                                     </div>
                                 ) : (
                                     <>
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <h1 className="text-3xl font-display">{name}</h1>
-                                            {isVerified && <BadgeCheck className="w-6 h-6 fill-black text-white" />}
+                                        <div className="flex items-center gap-2 mb-0.5">
+                                            <h1 className="text-2xl font-display">{name}</h1>
+                                            {isVerified && <BadgeCheck className="w-5 h-5 fill-black text-white" />}
                                         </div>
-                                        <p className="text-text-secondary font-medium mb-4 flex items-center gap-2">
+                                        <p className="text-text-secondary text-sm font-medium mb-1 flex items-center gap-2">
                                             {role} • {city}
                                             <span className="w-1.5 h-1.5 rounded-full bg-accent-green" />
-                                            <span className="text-[10px] px-2 py-0.5 bg-surface-2 rounded-full uppercase tracking-tighter font-bold border border-border">
-                                                {subscription} Account
-                                            </span>
+                                            <span className="text-[10px] px-2 py-0.5 bg-surface-2 rounded-full uppercase tracking-tighter font-bold border border-border">{subscription} Account</span>
                                         </p>
-                                        <div className="flex gap-4 mb-6">
-                                            <span className="flex items-center gap-1.5 text-xs text-text-secondary">
-                                                <MapPin className="w-3.5 h-3.5" /> {city}
-                                            </span>
-                                            <Link href={formatURL(website)} target="_blank" className="flex items-center gap-1.5 text-xs text-primary hover:underline">
-                                                <Globe className="w-3.5 h-3.5" /> {website.replace(/^https?:\/\//, '')}
+                                        {bio ? (
+                                            <p className="text-sm text-text-secondary leading-relaxed mb-3 max-w-md">{bio}</p>
+                                        ) : (
+                                            <p className="text-sm text-text-muted italic mb-3">No bio yet — click Edit Profile to add one.</p>
+                                        )}
+                                        <div className="flex gap-8 mb-3">
+                                            <div><p className="text-[10px] uppercase font-bold text-text-muted">Signals</p><p className="text-xl font-mono font-bold">{mySignals.length}</p></div>
+                                            <div><p className="text-[10px] uppercase font-bold text-text-muted">Connections</p><p className="text-xl font-mono font-bold">{connections.length}</p></div>
+                                            <div>
+                                                <p className="text-[10px] uppercase font-bold text-text-muted">Rating</p>
+                                                <div className="flex items-center gap-1"><p className="text-xl font-mono font-bold">{avgRating > 0 ? avgRating.toFixed(1) : '—'}</p>{avgRating > 0 && <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />}</div>
+                                                <p className="text-[10px] text-text-muted">{myRatings.length} reviews</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button onClick={() => setIsEditing(true)} className="px-4 py-2 bg-black text-white rounded-md text-xs font-bold uppercase tracking-widest flex items-center gap-2 hover:opacity-90">
+                                                <Edit3 className="w-3.5 h-3.5" /> Edit Profile
+                                            </button>
+                                            <Link href="/subscription" className="px-4 py-2 border border-border rounded-md text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-surface-2">
+                                                <Star className="w-3.5 h-3.5" /> {subscription === 'Free' ? 'Upgrade' : 'My Plan'}
                                             </Link>
                                         </div>
-                                        <p className="text-sm text-text-secondary leading-relaxed max-w-lg mb-6">
-                                            {bio}
-                                        </p>
                                     </>
                                 )}
-                            </div>
-                            <div className="flex flex-col gap-2 shrink-0">
-                                {isEditing ? (
-                                    <>
-                                        <button onClick={handleSave} className="px-6 py-2 bg-primary text-white rounded-md text-sm font-bold uppercase tracking-widest flex items-center gap-2 hover:opacity-90">
-                                            <Check className="w-4 h-4" /> Save
-                                        </button>
-                                        <button onClick={handleCancel} className="px-6 py-2 border border-border rounded-md text-sm font-bold uppercase tracking-widest flex items-center gap-2 hover:bg-surface-2">
-                                            <X className="w-4 h-4" /> Cancel
-                                        </button>
-                                    </>
-                                ) : (
-                                    <>
-                                        <button onClick={() => setIsEditing(true)} className="px-6 py-2 bg-black text-white rounded-md text-sm font-bold uppercase tracking-widest flex items-center gap-2 hover:opacity-90">
-                                            <Edit3 className="w-4 h-4" /> Edit Profile
-                                        </button>
-                                        <Link href="/subscription" className="px-6 py-2 border border-border rounded-md text-sm font-bold uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-surface-2">
-                                            <Star className="w-4 h-4" /> {subscription === 'Free' ? 'Upgrade' : 'My Plan'}
-                                        </Link>
-                                    </>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Stats Section */}
-                        <div className="flex gap-12 pt-6">
-                            <div>
-                                <p className="text-[10px] uppercase font-bold text-text-muted mb-1">Signals</p>
-                                <p className="text-2xl font-mono font-bold">{mySignals.length}</p>
-                            </div>
-                            <div>
-                                <p className="text-[10px] uppercase font-bold text-text-muted mb-1">Connections</p>
-                                <p className="text-2xl font-mono font-bold">{connections.length}</p>
-                            </div>
-                            <div>
-                                <p className="text-[10px] uppercase font-bold text-text-muted mb-1">Rating</p>
-                                <div className="flex items-center gap-1">
-                                    <p className="text-2xl font-mono font-bold">{avgRating > 0 ? avgRating.toFixed(1) : '—'}</p>
-                                    {avgRating > 0 && <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />}
-                                </div>
-                                <p className="text-[10px] text-text-muted">{myRatings.length} {myRatings.length === 1 ? 'review' : 'reviews'}</p>
                             </div>
                         </div>
                     </div>
@@ -443,6 +380,43 @@ export default function UserProfile() {
                                 )
                             )}
                         </div>
+                    </div>
+                    {/* ── Logout & Delete Account ── */}
+                    <div className="px-8 py-6 border-t border-border flex flex-col gap-3">
+                        <button
+                            onClick={() => { useAuthStore.getState().clearAuth(); router.push('/auth') }}
+                            className="w-full flex items-center justify-center gap-2 py-3 border border-border text-text-muted rounded-xl text-sm font-bold uppercase tracking-widest hover:bg-surface-2 transition-colors"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                            Log Out
+                        </button>
+                        
+                        <button
+                            onClick={() => {
+                                if (window.confirm('Are you absolutely sure you want to delete your account? This cannot be undone.')) {
+                                    const store = useLocalUserStore.getState()
+                                    // Make sure we have the active user's email
+                                    if (user) {
+                                        store.deleteUser(user.email)
+                                    } else {
+                                        // Backup: use the auth store email
+                                        const authUser = useAuthStore.getState().user
+                                        if (authUser?.email) store.deleteUser(authUser.email)
+                                    }
+                                    
+                                    // Wipe local simulated stores so a new account doesn't inherit them
+                                    useNetworkStore.getState().clearAll()
+                                    useResponseStore.getState().clearAll()
+                                    
+                                    useAuthStore.getState().clearAuth()
+                                    router.push('/auth')
+                                }
+                            }}
+                            className="w-full flex items-center justify-center gap-2 py-3 border border-red-200/50 text-red-500 rounded-xl text-sm font-bold uppercase tracking-widest hover:bg-red-500/10 transition-colors"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                            Delete Account
+                        </button>
                     </div>
                 </main>
 

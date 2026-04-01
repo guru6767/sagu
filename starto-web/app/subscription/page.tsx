@@ -3,8 +3,9 @@
 import Sidebar from '@/components/feed/Sidebar'
 import { Check, Shield, Zap, Star, Rocket, BadgeCheck } from 'lucide-react'
 import { motion } from 'framer-motion'
-import { useOnboardingStore } from '@/store/useOnboardingStore'
+import { useAuthStore } from '@/store/useAuthStore'
 import { useRouter } from 'next/navigation'
+import { useEffect } from 'react'
 
 const plans = [
     {
@@ -54,8 +55,16 @@ const plans = [
 ]
 
 export default function SubscriptionPage() {
-    const { subscription, setSubscription } = useOnboardingStore()
+    const { user, updateUser, isAuthenticated } = useAuthStore()
     const router = useRouter()
+
+    useEffect(() => {
+        if (!isAuthenticated) {
+            router.push('/auth')
+        }
+    }, [isAuthenticated, router])
+
+    const subscription = user?.subscription || 'Free'
 
     const handleUpgrade = (planName: string) => {
         if (planName === subscription) return
@@ -63,11 +72,13 @@ export default function SubscriptionPage() {
         // Simulate checkout process
         const confirm = window.confirm(`Confirm upgrade to ${planName} plan?`)
         if (confirm) {
-            setSubscription(planName as 'Free' | 'Pro' | 'Founder')
+            updateUser({ subscription: planName as 'Free' | 'Pro' | 'Founder' })
             alert(`Welcome to ${planName}! Your verified badge is now active.`)
             router.push('/profile')
         }
     }
+
+    if (!isAuthenticated || !user) return <div className="min-h-screen bg-background flex justify-center items-center text-text-muted">Loading...</div>;
 
     return (
         <div className="min-h-screen bg-background flex justify-center">

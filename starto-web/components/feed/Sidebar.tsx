@@ -1,11 +1,11 @@
 "use client"
 
-import { Home, Zap, BarChart3, Users, MapPin, Settings, BadgeCheck } from 'lucide-react'
+import { Home, Zap, BarChart3, Users, MapPin, Settings, BadgeCheck, LogIn } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import Image from 'next/image'
 import { useState } from 'react'
-import { useOnboardingStore } from '@/store/useOnboardingStore'
+import { useAuthStore } from '@/store/useAuthStore'
 import { useSignalStore } from '@/store/useSignalStore'
 import { useNetworkStore } from '@/store/useNetworkStore'
 
@@ -20,38 +20,49 @@ const navItems = [
 
 export default function Sidebar() {
     const pathname = usePathname()
-    const { isVerified, name, role, city, avatarUrl, username } = useOnboardingStore()
+    const { isAuthenticated, user } = useAuthStore()
     const { signals } = useSignalStore()
     const { connections } = useNetworkStore()
     const [imageError, setImageError] = useState(false)
 
-    const mySignalCount = signals.filter(s => s.username === username).length
-    const myNetworkCount = connections.length
+    const mySignalCount = user ? signals.filter(s => s.username === user.username).length : 0
+    const myNetworkCount = user ? connections.length : 0
 
     return (
         <aside className="w-[240px] sticky top-0 h-screen flex flex-col border-r border-border bg-background p-4 pt-8 shrink-0">
-            <Link href="/profile" className="flex items-center gap-3 mb-10 px-2 group hover:bg-surface-2 p-2 rounded-xl transition-all">
-                <div className="w-10 h-10 bg-surface-2 rounded-full overflow-hidden border border-border relative flex items-center justify-center">
-                    {avatarUrl && !imageError ? (
-                        <Image
-                            src={avatarUrl}
-                            alt="Profile"
-                            fill
-                            className="object-cover"
-                            onError={() => setImageError(true)}
-                        />
-                    ) : (
-                        <Users className="w-6 h-6 text-text-muted" />
-                    )}
-                </div>
-                <div className="overflow-hidden">
-                    <div className="flex items-center gap-1.5">
-                        <h3 className="font-medium text-sm truncate group-hover:text-primary transition-colors">{name}</h3>
-                        {isVerified && <BadgeCheck className="w-3.5 h-3.5 fill-black text-white" />}
+            {isAuthenticated && user ? (
+                <Link href="/profile" className="flex items-center gap-3 mb-10 px-2 group hover:bg-surface-2 p-2 rounded-xl transition-all">
+                    <div className="w-10 h-10 bg-surface-2 rounded-full overflow-hidden border border-border relative flex items-center justify-center">
+                        {user.avatarUrl && !imageError ? (
+                            <Image
+                                src={user.avatarUrl}
+                                alt="Profile"
+                                fill
+                                className="object-cover"
+                                onError={() => setImageError(true)}
+                            />
+                        ) : (
+                            <Users className="w-6 h-6 text-text-muted" />
+                        )}
                     </div>
-                    <p className="text-[10px] text-text-muted uppercase tracking-wider font-bold">{role} • {city.split(',')[0]}</p>
-                </div>
-            </Link>
+                    <div className="overflow-hidden">
+                        <div className="flex items-center gap-1.5">
+                            <h3 className="font-medium text-sm truncate group-hover:text-primary transition-colors">{user.name}</h3>
+                        </div>
+                        <p className="text-[10px] text-text-muted uppercase tracking-wider font-bold">{user.role} • {user.city?.split(',')[0]}</p>
+                    </div>
+                </Link>
+            ) : (
+                <Link href="/auth" className="flex items-center gap-3 mb-10 px-2 group hover:bg-surface-2 p-2 rounded-xl transition-all border border-transparent hover:border-border">
+                    <div className="w-10 h-10 bg-primary/10 rounded-full overflow-hidden border border-primary/20 relative flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+                        <LogIn className="w-5 h-5" />
+                    </div>
+                    <div className="overflow-hidden">
+                        <h3 className="font-bold text-sm text-primary">Login / Register</h3>
+                        <p className="text-[10px] text-text-muted uppercase tracking-wider font-bold mt-0.5">Enter Ecosystem</p>
+                    </div>
+                </Link>
+            )}
 
             <nav className="flex-1 space-y-1">
                 {navItems.map((item) => {

@@ -6,11 +6,11 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useNetworkStore } from '@/store/useNetworkStore'
 import { useRatingStore } from '@/store/useRatingStore'
-import { Check, X, Users, UserCheck, MessageSquare, Zap, Link as LinkIcon } from 'lucide-react'
+import { Check, X, Users, UserCheck, MessageSquare, Zap, Link as LinkIcon, UserPlus, CheckCheck } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 export default function NetworkPage() {
-    const { connections, pendingRequests, offers, acceptRequest, rejectRequest, removeConnection, deleteOffer } = useNetworkStore()
+    const { connections, pendingRequests, offers, acceptRequest, rejectRequest, removeConnection, deleteOffer, sendRequest, isConnected, hasPendingRequest } = useNetworkStore()
     const { getAverageRating } = useRatingStore()
     const [tab, setTab] = useState<'connections' | 'requests' | 'offers'>('connections')
     const [search, setSearch] = useState('')
@@ -216,9 +216,25 @@ export default function NetworkPage() {
                                                             </div>
                                                         </Link>
                                                         <div>
-                                                            <Link href={`/profile/${o.fromUsername}`} className="font-medium text-sm hover:text-primary transition-colors hover:underline">
-                                                                {o.name} <span className="text-text-muted text-xs font-normal">(@{o.fromUsername})</span>
-                                                            </Link>
+                                                            <div className="flex items-center gap-2">
+                                                                <Link href={`/profile/${o.fromUsername}`} className="font-medium text-sm hover:text-primary transition-colors hover:underline">
+                                                                    {o.name} <span className="text-text-muted text-xs font-normal">(@{o.fromUsername})</span>
+                                                                </Link>
+                                                                {/* Connect icon */}
+                                                                {isConnected(o.fromUsername) ? (
+                                                                    <span title="Already connected" className="text-green-500"><CheckCheck className="w-4 h-4" /></span>
+                                                                ) : hasPendingRequest(o.fromUsername) ? (
+                                                                    <span title="Request sent" className="text-yellow-500"><CheckCheck className="w-4 h-4" /></span>
+                                                                ) : (
+                                                                    <button
+                                                                        title="Send connection request"
+                                                                        onClick={() => sendRequest({ username: o.fromUsername, category: 'Network', timeAdded: Date.now() })}
+                                                                        className="text-text-muted hover:text-primary transition-colors p-0.5 rounded"
+                                                                    >
+                                                                        <UserPlus className="w-4 h-4" />
+                                                                    </button>
+                                                                )}
+                                                            </div>
                                                             <p className="text-[10px] text-text-muted mt-0.5">
                                                                 {new Date(o.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                                                             </p>

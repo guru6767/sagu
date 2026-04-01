@@ -28,6 +28,7 @@ interface NetworkState {
     deleteOffer: (id: string) => void;
     isConnected: (username: string) => boolean;
     hasPendingRequest: (username: string) => boolean;
+    clearAll: () => void;
 }
 
 export const useNetworkStore = create<NetworkState>()(
@@ -67,6 +68,7 @@ export const useNetworkStore = create<NetworkState>()(
             })),
             isConnected: (username) => get().connections.some(c => c.username === username),
             hasPendingRequest: (username) => get().pendingRequests.some(r => r.username === username),
+            clearAll: () => set({ connections: [], pendingRequests: [], offers: [] }),
         }),
         {
             name: 'starto-network-storage',

@@ -5,13 +5,160 @@ import { motion, AnimatePresence } from 'framer-motion'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useState, useRef, useEffect } from 'react'
-import { useSignalStore, Signal } from '@/store/useSignalStore'
-import { useOnboardingStore } from '@/store/useOnboardingStore'
+import { useSignalStore, Signal, Comment } from '@/store/useSignalStore'
+import { useAuthStore } from '@/store/useAuthStore'
 import { useNetworkStore } from '@/store/useNetworkStore'
 import { useResponseStore } from '@/store/useResponseStore'
 import RaiseSignalModal from './RaiseSignalModal'
 import InsightsModal from './InsightsModal'
 import HelpModal from './HelpModal'
+
+// ── @Mention hook — searches all known usernames in the store ────────────────
+function useMentionSuggestions(text: string) {
+    const { signals } = useSignalStore()
+    const atIdx = text.lastIndexOf('@')
+    if (atIdx === -1) return { suggestions: [], query: '', atIdx: -1 }
+    const query = text.slice(atIdx + 1).toLowerCase()
+    const allUsers = Array.from(new Set(signals.map(s => s.username)))
+    const suggestions = query.length >= 1
+        ? allUsers.filter(u => u.toLowerCase().includes(query)).slice(0, 5)
+        : []
+    return { suggestions, query, atIdx }
+}
+
+// ── Reply Input with @mention ─────────────────────────────────────────────────
+function ReplyInput({ placeholder, onSubmit, onCancel }: {
+    placeholder: string
+    onSubmit: (text: string) => void
+    onCancel: () => void
+}) {
+    const [text, setText] = useState(placeholder.startsWith('Reply') ? '' : '')
+    const [preText] = useState(placeholder.startsWith('@') ? `@${placeholder.split('@')[1]?.split('...')[0]} ` : '')
+    const [value, setValue] = useState(preText)
+    const { suggestions, atIdx } = useMentionSuggestions(value)
+    const inputRef = useRef<HTMLInputElement>(null)
+    useEffect(() => { inputRef.current?.focus() }, [])
+
+    const applyMention = (username: string) => {
+        const before = value.slice(0, atIdx)
+        setValue(`${before}@${username} `)
+        inputRef.current?.focus()
+    }
+
+    const submit = () => {
+        if (!value.trim()) return
+        onSubmit(value.trim())
+        setValue('')
+    }
+
+    return (
+        <div className="mt-2 relative">
+            {suggestions.length > 0 && (
+                <div className="absolute bottom-full mb-1 left-0 bg-white border border-border shadow-lg rounded-xl z-30 w-48 py-1 overflow-hidden">
+                    {suggestions.map(u => (
+                        <button key={u} onMouseDown={(e) => { e.preventDefault(); applyMention(u) }}
+                            className="w-full text-left px-3 py-1.5 text-xs hover:bg-surface-2 flex items-center gap-2">
+                            <span className="font-bold text-black">@{u}</span>
+                        </button>
+                    ))}
+                </div>
+            )}
+            <div className="flex gap-2 items-center">
+                <input
+                    ref={inputRef}
+                    type="text"
+                    placeholder={placeholder}
+                    className="flex-1 bg-surface-2 rounded-full px-3 py-1 text-xs outline-none border border-border focus:border-primary"
+                    value={value}
+                    onChange={e => setValue(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') submit() }}
+                />
+                <button onClick={submit} disabled={!value.trim()} className="text-primary font-bold text-xs disabled:opacity-40">Post</button>
+                <button onClick={onCancel} className="text-text-muted text-xs">Cancel</button>
+            </div>
+        </div>
+    )
+}
+
+// ── Recursive Comment/Reply Row ───────────────────────────────────────────────
+function CommentRow({ comment, signalId, currentUser, depth = 0 }: {
+    comment: Comment; signalId: string; currentUser: string | null | undefined; depth?: number
+}) {
+    const [showReply, setShowReply] = useState(false)
+    const avatarSize = depth === 0 ? 'w-6 h-6' : 'w-5 h-5'
+    const textSize = depth === 0 ? 'text-sm' : 'text-xs'
+
+    const handleReply = (text: string) => {
+        if (!currentUser) return
+        
+        // If replying to a reply, prefix their handle so it's clear who is being addressed
+        const finalString = depth > 0 && !text.startsWith(`@${comment.username}`) 
+            ? `@${comment.username} ${text}` 
+            : text;
+            
+        useSignalStore.getState().addReply(signalId, comment.id, finalString, currentUser)
+        setShowReply(false)
+    }
+
+    return (
+        <div className={`flex gap-2 ${textSize}`}>
+            <div className={`${avatarSize} rounded-full bg-surface-2 overflow-hidden shrink-0 mt-0.5 relative`}>
+                <Image src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${comment.username}`} alt={comment.username} fill className="object-cover" />
+            </div>
+            <div className="flex-1 min-w-0">
+                <p>
+                    <span className="font-bold mr-1.5 text-black cursor-pointer hover:underline">@{comment.username}</span>
+                    <span className="text-text-secondary">{comment.text}</span>
+                </p>
+                <div className="flex items-center gap-3 mt-0.5">
+                    <p className="text-[10px] text-text-muted">
+                        {new Date(comment.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                    </p>
+                    {currentUser && (
+                        <button onClick={() => setShowReply(v => !v)} className="text-[10px] font-bold text-text-muted hover:text-primary transition-colors">
+                            Reply
+                        </button>
+                    )}
+                </div>
+
+                {/* Nested replies — always rendered recursively */}
+                {(comment.replies || []).length > 0 && (
+                    <div className="mt-2 space-y-2 pl-3 border-l-2 border-border">
+                        {(comment.replies || []).map(reply => (
+                            <CommentRow key={reply.id} comment={reply} signalId={signalId} currentUser={currentUser} depth={depth + 1} />
+                        ))}
+                    </div>
+                )}
+
+                {showReply && (
+                    <ReplyInput
+                        placeholder={`Reply to @${comment.username}...`}
+                        onSubmit={handleReply}
+                        onCancel={() => setShowReply(false)}
+                    />
+                )}
+            </div>
+        </div>
+    )
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Keep old name as alias for the main comment list
+function CommentThread({ comment, signalId, currentUser }: { comment: Comment; signalId: string; currentUser: string | null | undefined }) {
+    return <CommentRow comment={comment} signalId={signalId} currentUser={currentUser} depth={0} />
+}
+
+// Known role keywords — only these are treated as the role suffix
+const ROLE_KEYWORDS = new Set(['founder', 'investor', 'mentor', 'talent', 'expert'])
+
+// Formats username for display:
+//   'sagar_g_founder'  → { handle: '@sagar_g',  role: 'Founder' }
+//   'krishna_k88_founder' → { handle: '@krishna_k88', role: 'Founder' }
+//   'talent' / '_talent' / any unrecognised → '@username' (plain, no badge)
+// Simplified display: we now just show the full username with an @
+function formatUsername(username: string): string {
+    return username ? `@${username}` : '@'
+}
 
 interface SignalCardProps {
     id: string
@@ -29,7 +176,8 @@ interface SignalCardProps {
 }
 
 export default function SignalCard({ id, title, username, timeAgo, category, description, strength, stats }: SignalCardProps) {
-    const { username: currentUser } = useOnboardingStore()
+    const { user } = useAuthStore()
+    const currentUser = user?.username
     const { deleteSignal, signals } = useSignalStore()
     const { isConnected, sendRequest, hasPendingRequest } = useNetworkStore()
     const { addResponse, hasResponded } = useResponseStore()
@@ -84,8 +232,8 @@ export default function SignalCard({ id, title, username, timeAgo, category, des
                         <Image src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`} alt={username} fill className="object-cover" />
                     </div>
                     <div>
-                        <div className="flex items-center gap-2">
-                            <span className="font-medium text-sm group-hover/profile:text-primary transition-colors">@{username}</span>
+                        <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-sm text-black group-hover/profile:text-primary transition-colors cursor-pointer">{formatUsername(username)}</span>
                             <span className={`w-1.5 h-1.5 rounded-full ${colorClass}`} />
                             <span className="text-xs text-text-muted">{strength}</span>
                         </div>
@@ -231,7 +379,7 @@ export default function SignalCard({ id, title, username, timeAgo, category, des
                 </button>
             </div>
             
-            {/* Instagram Style Comments Section */}
+            {/* Instagram Style Threaded Comments Section */}
             <AnimatePresence>
                 {showComments && (
                     <motion.div
@@ -240,33 +388,25 @@ export default function SignalCard({ id, title, username, timeAgo, category, des
                         exit={{ opacity: 0, height: 0 }}
                         className="mt-4 pt-4 border-t border-border overflow-hidden"
                     >
-                        <div className="space-y-3 max-h-60 overflow-y-auto pr-2" style={{ scrollbarWidth: 'thin' }}>
+                        <div className="space-y-4 max-h-80 overflow-y-auto pr-2" style={{ scrollbarWidth: 'thin' }}>
                             {(currentSignal?.comments || []).length === 0 ? (
                                 <p className="text-center text-xs text-text-muted py-4">No responses yet. Be the first to respond!</p>
                             ) : (
                                 (currentSignal?.comments || []).map(comment => (
-                                    <div key={comment.id} className="flex gap-3 text-sm">
-                                        <div className="w-6 h-6 rounded-full bg-surface-2 overflow-hidden shrink-0 mt-0.5 relative">
-                                            <Image src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${comment.username}`} alt={comment.username} fill className="object-cover" />
-                                        </div>
-                                        <div>
-                                            <p>
-                                                <span className="font-bold mr-2 text-black cursor-pointer hover:underline">@{comment.username}</span>
-                                                <span className="text-text-secondary">{comment.text}</span>
-                                            </p>
-                                            <p className="text-[10px] text-text-muted mt-0.5">
-                                                {new Date(comment.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
-                                            </p>
-                                        </div>
-                                    </div>
+                                    <CommentThread
+                                        key={comment.id}
+                                        comment={comment}
+                                        signalId={id}
+                                        currentUser={currentUser}
+                                    />
                                 ))
                             )}
                         </div>
 
-                        {/* Comment Input */}
+                        {/* Main Comment Input */}
                         <div className="mt-4 flex gap-2 items-center border-t border-border pt-3">
                             <div className="w-8 h-8 rounded-full bg-surface-2 overflow-hidden shrink-0 relative">
-                                <Image src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser || 'krish'}`} alt="me" fill className="object-cover" />
+                                <Image src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser || 'user'}`} alt="me" fill className="object-cover" />
                             </div>
                             <input
                                 type="text"
@@ -276,7 +416,7 @@ export default function SignalCard({ id, title, username, timeAgo, category, des
                                 onChange={(e) => setCommentText(e.target.value)}
                                 onKeyDown={(e) => {
                                     if (e.key === 'Enter' && commentText.trim()) {
-                                        useSignalStore.getState().addComment(id, commentText.trim(), currentUser || 'krish_startup')
+                                        useSignalStore.getState().addComment(id, commentText.trim(), currentUser || 'user')
                                         setCommentText('')
                                         if (!alreadyResponded && !isOwner) {
                                             addResponse({ signalId: id, signalTitle: title, signalUsername: username, signalCategory: category })
@@ -288,7 +428,7 @@ export default function SignalCard({ id, title, username, timeAgo, category, des
                                 disabled={!commentText.trim()}
                                 onClick={() => {
                                     if (commentText.trim()) {
-                                        useSignalStore.getState().addComment(id, commentText.trim(), currentUser || 'krish_startup')
+                                        useSignalStore.getState().addComment(id, commentText.trim(), currentUser || 'user')
                                         setCommentText('')
                                         if (!alreadyResponded && !isOwner) {
                                             addResponse({ signalId: id, signalTitle: title, signalUsername: username, signalCategory: category })

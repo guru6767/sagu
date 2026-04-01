@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, Zap, Link as LinkIcon, Building2 } from 'lucide-react'
 import { useSignalStore } from '@/store/useSignalStore'
 import { useNetworkStore } from '@/store/useNetworkStore'
-import { useOnboardingStore } from '@/store/useOnboardingStore'
+import { useAuthStore } from '@/store/useAuthStore'
 
 interface HelpModalProps {
     isOpen: boolean
@@ -17,7 +17,7 @@ interface HelpModalProps {
 export default function HelpModal({ isOpen, onClose, signalId, signalTitle }: HelpModalProps) {
     const { incrementOffer } = useSignalStore()
     const addOffer = useNetworkStore(state => state.addOffer)
-    const currentUser = useOnboardingStore(state => state.username)
+    const currentUser = useAuthStore(state => state.user?.username)
     
     const [name, setName] = useState('')
     const [projectLink, setProjectLink] = useState('')
