@@ -1,9 +1,9 @@
 # Starto V2 - Frontend Runner
 # This script starts the Next.js development server with local API configuration.
 
-$env:NEXT_PUBLIC_API_BASE_URL = "http://localhost:8081"
-$env:NEXT_PUBLIC_FIREBASE_API_KEY = "dummy_key"
-$env:NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN = "dummy_domain"
+$env:NEXT_PUBLIC_API_BASE_URL = if ($env:NEXT_PUBLIC_API_BASE_URL) { $env:NEXT_PUBLIC_API_BASE_URL } else { "http://localhost:8081" }
+$env:NEXT_PUBLIC_FIREBASE_API_KEY = if ($env:NEXT_PUBLIC_FIREBASE_API_KEY) { $env:NEXT_PUBLIC_FIREBASE_API_KEY } else { "dummy_key" }
+$env:NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN = if ($env:NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN) { $env:NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN } else { "dummy_domain" }
 
 Write-Host "Starting Starto V2 Frontend..." -ForegroundColor Cyan
 Set-Location -Path "$PSScriptRoot\starto-web"

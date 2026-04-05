@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Zap } from 'lucide-react'
+import { X, Zap, CheckCircle, AlertTriangle } from 'lucide-react'
 import { useSignalStore, Signal } from '@/store/useSignalStore'
 import { useAuthStore } from '@/store/useAuthStore'
 import { useRouter } from 'next/navigation'
+import { signalsApi } from '@/lib/apiClient'
 
 interface RaiseSignalModalProps {
     isOpen: boolean;
@@ -14,7 +15,7 @@ interface RaiseSignalModalProps {
 }
 
 export default function RaiseSignalModal({ isOpen, onClose, editSignal }: RaiseSignalModalProps) {
-    const { user } = useAuthStore();
+    const { user, token } = useAuthStore();
     const { addSignal } = useSignalStore();
     const router = useRouter();
     
@@ -23,6 +24,8 @@ export default function RaiseSignalModal({ isOpen, onClose, editSignal }: RaiseS
     const [headline, setHeadline] = useState('');
     const [details, setDetails] = useState('');
     const [duration, setDuration] = useState(0);
+    const [submitting, setSubmitting] = useState(false);
+    const [toast, setToast] = useState<{ type: 'success' | 'warn'; msg: string } | null>(null);
 
     useEffect(() => {
         if (isOpen && editSignal) {
@@ -30,7 +33,6 @@ export default function RaiseSignalModal({ isOpen, onClose, editSignal }: RaiseS
             setCategory(editSignal.category);
             setHeadline(editSignal.title);
             setDetails(editSignal.description);
-            // Try to parse number from 'X Days' or fallback to 7
             const parsedDuration = parseInt(editSignal.strength.split(' ')[0]);
             setDuration(isNaN(parsedDuration) ? 7 : parsedDuration);
         } else if (isOpen && !editSignal) {
@@ -39,44 +41,89 @@ export default function RaiseSignalModal({ isOpen, onClose, editSignal }: RaiseS
             setCategory('Talent');
             setDuration(0);
             setSignalType('need');
+            setToast(null);
         }
     }, [isOpen, editSignal]);
 
     if (!isOpen) return null
 
-    const handleBroadcast = () => {
+    const handleBroadcast = async () => {
         if (!headline || !details || duration === 0) return;
         if (duration > 7) {
-            // Redirect to upgrade page
             onClose();
             router.push('/subscription');
             return;
         }
-        
+
+        setSubmitting(true);
+        setToast(null);
+
         const currentUsername = user?.username || 'user';
 
         if (editSignal) {
+            // Edit mode: update local store (backend PUT would need auth too)
             useSignalStore.getState().updateSignal(editSignal.id, {
                 title: headline,
-                category: category,
+                category,
                 description: details,
                 strength: `${duration} Days`,
-                type: signalType
+                type: signalType,
             });
-        } else {
+            setSubmitting(false);
+            onClose();
+            return;
+        }
+
+        // ── Try to post to backend first ─────────────────────────────────────
+        const { data, error, status } = await signalsApi.create(
+            {
+                title: headline,
+                description: details,
+                category,
+                type: signalType,
+                seeking: category,
+                city: user?.city || '',
+                timelineDays: duration,
+                signalStrength: `${duration} Days`,
+            },
+            token || ''
+        );
+
+        if (data && !error) {
+            // ✅ Saved to DB — show success toast briefly then close
+            setToast({ type: 'success', msg: '✓ Signal broadcast to backend DB!' });
+            setTimeout(() => { onClose(); }, 1200);
+        } else if (status === 401 || status === 403) {
+            // ⚠️ Firebase token not valid (dummy key) — fall back to local store
             addSignal({
                 title: headline,
                 username: currentUsername,
                 timeAgo: 'Just now',
-                category: category,
+                category,
                 description: details,
                 strength: `${duration} Days`,
-                type: signalType
+                type: signalType,
             });
+            setToast({ type: 'warn', msg: '⚠ Saved locally (backend auth not configured)' });
+            setTimeout(() => { onClose(); }, 1500);
+        } else {
+            // Network error or other — fall back to local
+            addSignal({
+                title: headline,
+                username: currentUsername,
+                timeAgo: 'Just now',
+                category,
+                description: details,
+                strength: `${duration} Days`,
+                type: signalType,
+            });
+            setToast({ type: 'warn', msg: `Saved locally. Backend error: ${error}` });
+            setTimeout(() => { onClose(); }, 1800);
         }
-        
-        onClose();
+
+        setSubmitting(false);
     };
+
 
     return (
         <AnimatePresence>
@@ -182,13 +229,37 @@ export default function RaiseSignalModal({ isOpen, onClose, editSignal }: RaiseS
                         </section>
                     </div>
 
-                    <div className="p-6">
+                    <div className="p-6 space-y-3">
+                        {/* Toast feedback */}
+                        <AnimatePresence>
+                            {toast && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: 8 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0 }}
+                                    className={`flex items-center gap-2 p-3 rounded-lg text-xs font-medium ${
+                                        toast.type === 'success'
+                                            ? 'bg-green-50 border border-green-200 text-green-700'
+                                            : 'bg-orange-50 border border-orange-200 text-orange-700'
+                                    }`}
+                                >
+                                    {toast.type === 'success'
+                                        ? <CheckCircle className="w-4 h-4 shrink-0" />
+                                        : <AlertTriangle className="w-4 h-4 shrink-0" />
+                                    }
+                                    {toast.msg}
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+
                         <button 
                             onClick={handleBroadcast}
-                            disabled={!headline || !details || duration === 0}
+                            disabled={!headline || !details || duration === 0 || submitting}
                             className={`w-full text-white px-8 py-3.5 rounded-xl font-bold text-xs tracking-wider flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed uppercase ${duration > 7 ? 'bg-orange-500 hover:bg-orange-600' : 'bg-black hover:bg-black/90'}`}
                         >
-                            {duration === 0 ? (
+                            {submitting ? (
+                                <><Zap className="w-4 h-4 fill-white text-white animate-pulse" /> Broadcasting…</>
+                            ) : duration === 0 ? (
                                 <>Select Duration to Broadcast</>
                             ) : duration > 7 ? (
                                 <><Zap className="w-4 h-4 fill-white text-white" /> Upgrade to Pro → Subscription</>

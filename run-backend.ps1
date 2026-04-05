@@ -26,19 +26,21 @@ if ($jdkPath) {
 $env:Path = "$env:JAVA_HOME\bin;" + $env:Path
 
 # Set Default Environment Variables for Local Development
-$env:DATABASE_URL = "jdbc:postgresql://localhost:5432/starto"
-$env:DATABASE_USERNAME = "postgres"
-$env:DATABASE_PASSWORD = "admin"
-$env:REDIS_URL = "redis://localhost:6379"
-$env:FIREBASE_CONFIG_PATH = "$PSScriptRoot\firebase-service-account.json"
-$env:OPENAI_API_KEY = "dummy_key"
-$env:GEMINI_API_KEY = "dummy_key"
-$env:RAZORPAY_KEY_ID = "dummy_key"
-$env:RAZORPAY_KEY_SECRET = "dummy_key"
-$env:RAZORPAY_WEBHOOK_SECRET = "dummy_key"
-$env:STRIPE_API_KEY = "dummy_key"
-$env:STRIPE_WEBHOOK_SECRET = "dummy_key"
-$env:SENDGRID_API_KEY = "dummy_key"
+$env:DATABASE_URL = if ($env:DATABASE_URL) { $env:DATABASE_URL } else { "jdbc:postgresql://localhost:5432/starto" }
+$env:DATABASE_USERNAME = if ($env:DATABASE_USERNAME) { $env:DATABASE_USERNAME } else { "postgres" }
+$env:DATABASE_PASSWORD = if ($env:DATABASE_PASSWORD) { $env:DATABASE_PASSWORD } else { "password" }
+$env:REDIS_URL = if ($env:REDIS_URL) { $env:REDIS_URL } else { "redis://localhost:6379" }
+# Point to the firebase-service-account.json bundled inside starto-api resources
+$env:FIREBASE_CONFIG_PATH = "$PSScriptRoot\starto-api\src\main\resources\firebase-service-account.json"
+$env:OPENAI_API_KEY = if ($env:OPENAI_API_KEY) { $env:OPENAI_API_KEY } else { "dummy_openai_key" }
+$env:GEMINI_API_KEY = if ($env:GEMINI_API_KEY) { $env:GEMINI_API_KEY } else { "dummy_gemini_key" }
+$env:GOOGLE_MAPS_API_KEY = if ($env:GOOGLE_MAPS_API_KEY) { $env:GOOGLE_MAPS_API_KEY } else { "dummy_maps_key" }
+$env:RAZORPAY_KEY_ID = if ($env:RAZORPAY_KEY_ID) { $env:RAZORPAY_KEY_ID } else { "dummy_rzp_key" }
+$env:RAZORPAY_KEY_SECRET = if ($env:RAZORPAY_KEY_SECRET) { $env:RAZORPAY_KEY_SECRET } else { "dummy_rzp_secret" }
+$env:RAZORPAY_WEBHOOK_SECRET = if ($env:RAZORPAY_WEBHOOK_SECRET) { $env:RAZORPAY_WEBHOOK_SECRET } else { "dummy_webhook_secret" }
+$env:STRIPE_API_KEY = if ($env:STRIPE_API_KEY) { $env:STRIPE_API_KEY } else { "dummy_stripe_key" }
+$env:STRIPE_WEBHOOK_SECRET = if ($env:STRIPE_WEBHOOK_SECRET) { $env:STRIPE_WEBHOOK_SECRET } else { "dummy_stripe_webhook" }
+$env:SENDGRID_API_KEY = if ($env:SENDGRID_API_KEY) { $env:SENDGRID_API_KEY } else { "dummy_sendgrid_key" }
 
 if (-not (Test-Path $MAVEN_DIR)) {
     New-Item -ItemType Directory -Path $MAVEN_DIR | Out-Null

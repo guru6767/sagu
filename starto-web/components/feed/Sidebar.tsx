@@ -1,13 +1,14 @@
 "use client"
 
-import { Home, Zap, BarChart3, Users, MapPin, Settings, BadgeCheck, LogIn } from 'lucide-react'
+import { Home, Zap, BarChart3, Users, MapPin, Settings, LogIn } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import Image from 'next/image'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuthStore } from '@/store/useAuthStore'
 import { useSignalStore } from '@/store/useSignalStore'
 import { useNetworkStore } from '@/store/useNetworkStore'
+import { signalsApi } from '@/lib/apiClient'
 
 const navItems = [
     { icon: Home, label: 'Home Feed', href: '/feed' },
@@ -24,6 +25,14 @@ export default function Sidebar() {
     const { signals } = useSignalStore()
     const { connections } = useNetworkStore()
     const [imageError, setImageError] = useState(false)
+    const [backendStatus, setBackendStatus] = useState<'checking' | 'live' | 'offline'>('checking')
+
+    // Ping backend to check connectivity
+    useEffect(() => {
+        signalsApi.getAll().then(({ error }) => {
+            setBackendStatus(error ? 'offline' : 'live')
+        })
+    }, [])
 
     const mySignalCount = user ? signals.filter(s => s.username === user.username).length : 0
     const myNetworkCount = user ? connections.length : 0
@@ -86,7 +95,7 @@ export default function Sidebar() {
             </nav>
 
             <div className="pt-6 border-t border-border mt-auto">
-                <div className="grid grid-cols-2 gap-4 mb-2">
+                <div className="grid grid-cols-2 gap-4 mb-3">
                     <div>
                         <p className="text-[10px] uppercase font-bold text-text-muted mb-1">Signals</p>
                         <p className="text-lg font-mono font-bold">{mySignalCount}</p>
@@ -96,7 +105,24 @@ export default function Sidebar() {
                         <p className="text-lg font-mono font-bold">{myNetworkCount}</p>
                     </div>
                 </div>
-                <div className="mt-4 flex items-center gap-2 opacity-50 grayscale hover:grayscale-0 transition-all cursor-pointer">
+
+                {/* Backend connection status */}
+                <div className={`mb-3 flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-widest ${
+                    backendStatus === 'live'
+                        ? 'text-green-600 bg-green-50'
+                        : backendStatus === 'offline'
+                        ? 'text-orange-500 bg-orange-50'
+                        : 'text-text-muted bg-surface-2'
+                }`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${
+                        backendStatus === 'live' ? 'bg-green-500 animate-pulse'
+                        : backendStatus === 'offline' ? 'bg-orange-400'
+                        : 'bg-gray-400 animate-pulse'
+                    }`} />
+                    {backendStatus === 'live' ? 'API Live' : backendStatus === 'offline' ? 'Local Mode' : 'Checking…'}
+                </div>
+
+                <div className="flex items-center gap-2 opacity-50 grayscale hover:grayscale-0 transition-all cursor-pointer">
                     <Image src="/logo.png" alt="Starto Logo" width={20} height={20} className="invert" />
                     <span className="text-[10px] font-bold tracking-widest uppercase">Starto V2</span>
                 </div>

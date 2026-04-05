@@ -28,16 +28,16 @@ openai:
 
 google:
   ai:
-    api-key: ${GEMINI_API_KEY}
+    api-key: AIzaSyA629ErsahC4X340k129_GZraW6BcQ6Lh8
   maps:
-    api-key: dummy_Google_Maps_key
+    api-key: AIzaSyDKFYLZS7YUysjKu-rnKKK3VA-kGh3R2Fk
 
 firebase:
   config-path: C:/Users/sagar/Documents/starto/starto-v3/starto-api/src/main/resources/firebase-service-account.json
 
 razorpay:
   key:
-    id: dummy_rzp_key
-    secret: dummy_rzp_secret
+    id: rzp_test_SRvnpJPD9swW9T
+    secret: 1nWcy28BUbEFnQhJwWefBOMd
   plan:
     id: plan_fake123456789

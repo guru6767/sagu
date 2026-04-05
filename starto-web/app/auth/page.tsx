@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/useAuthStore'
 import { useLocalUserStore } from '@/store/useLocalUserStore'
 import { useSignalStore } from '@/store/useSignalStore'
+import { usersApi } from '@/lib/apiClient'
 
 type AuthMode = 'login' | 'signup' | 'onboarding'
 
@@ -96,7 +97,8 @@ export default function AuthPage() {
                 useSignalStore.getState().migrateUsername(migration.oldUsername, username)
             }
 
-            const mockUserData = {
+            // Build base profile from local store
+            const baseProfile = {
                 id: `local-${username}`,
                 firebaseUid: `local-${username}`,
                 username,
@@ -113,7 +115,25 @@ export default function AuthPage() {
                 signalCount: 0,
                 networkSize: 0,
             }
-            setAuth({ email: u.email, displayName: u.name, getIdToken: async () => `local-${username}` } as any, `local-${username}`, mockUserData)
+
+            // ── Try to fetch live profile from backend ────────────────────────
+            let finalProfile = baseProfile
+            const { data: backendUser } = await usersApi.getByUsername(username)
+            if (backendUser) {
+                // Merge backend data (plan, signalCount, etc.) into local profile
+                finalProfile = {
+                    ...baseProfile,
+                    id: backendUser.id || baseProfile.id,
+                    plan: backendUser.plan || 'Free',
+                    bio: backendUser.bio || u.bio,
+                    city: backendUser.city || u.city,
+                    industry: backendUser.industry || '',
+                    signalCount: backendUser.signalCount ?? 0,
+                    networkSize: backendUser.networkSize ?? 0,
+                }
+            }
+
+            setAuth({ email: u.email, displayName: u.name, getIdToken: async () => `local-${username}` } as any, `local-${username}`, finalProfile)
             router.push('/feed')
         } finally {
             setLoading(false)
