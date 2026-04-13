@@ -25,40 +25,16 @@ export default function OnboardingStep3() {
             >
                 <h2 className="text-3xl mb-8">What is your industry?</h2>
 
-                <div className="relative mb-6">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-text-muted" />
+                <div className="mb-8">
+                    <label className="text-sm font-medium mb-4 block">What is your industry?</label>
                     <input
                         type="text"
-                        placeholder="Search industry..."
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        className="w-full bg-surface-2 p-4 pl-12 rounded-md outline-none focus:ring-2 focus:ring-primary/10 border border-border focus:border-text-muted transition-all"
+                        placeholder="e.g. AgriTech, EdTech..."
+                        value={selected}
+                        onChange={(e) => setSelected(e.target.value)}
+                        className="w-full bg-surface-2 p-4 rounded-md outline-none focus:ring-2 focus:ring-primary/10 border border-border focus:border-text-muted transition-all"
                     />
                 </div>
-
-                <div className="max-h-64 overflow-y-auto border border-border rounded-md px-2 py-2 mb-8">
-                    {filtered.map(industry => (
-                        <button
-                            key={industry}
-                            onClick={() => setSelected(industry)}
-                            className={`w-full text-left p-3 rounded-md transition-all ${selected === industry ? 'bg-primary text-white' : 'hover:bg-surface-2'
-                                }`}
-                        >
-                            {industry}
-                        </button>
-                    ))}
-                </div>
-
-                {selected && (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-8">
-                        <label className="text-sm font-medium mb-2 block">Add sub-industry (optional)</label>
-                        <input
-                            type="text"
-                            placeholder="e.g., Drone Tech, Micro-SaaS"
-                            className="w-full border-b border-border py-2 outline-none focus:border-primary transition-all pr-4"
-                        />
-                    </motion.div>
-                )}
 
                 <button
                     disabled={!selected}

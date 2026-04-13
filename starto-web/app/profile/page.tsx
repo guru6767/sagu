@@ -16,7 +16,7 @@ import { useLocalUserStore } from '@/store/useLocalUserStore'
 
 export default function UserProfile() {
     const router = useRouter()
-    const { user, isAuthenticated, updateUser } = useAuthStore()
+    const { user, isAuthenticated, isLoading, updateUser } = useAuthStore()
     const { updateUserRecord } = useLocalUserStore()
 
     const formatURL = (url: string | null | undefined) => {
@@ -39,12 +39,11 @@ export default function UserProfile() {
         role = '',
         city = '',
         bio = '',
-        website = '',
-        linkedin = '',
-        twitter = '',
-        github = '',
-        avatarUrl = null,
-        coverUrl = null
+        websiteUrl = '',
+        linkedinUrl = '',
+        twitterUrl = '',
+        githubUrl = '',
+        avatarUrl = null
     } = user || {}
 
     const { signals } = useSignalStore()
@@ -63,71 +62,60 @@ export default function UserProfile() {
     const [isEditing, setIsEditing] = useState(false)
     const [isEditingSocial, setIsEditingSocial] = useState(false)
     
-    const [socialForm, setSocialForm] = useState({ linkedin, twitter, github })
+    const [socialForm, setSocialForm] = useState({ linkedinUrl, twitterUrl, githubUrl })
     const [editForm, setEditForm] = useState({
         name,
         role,
         city,
         bio,
-        website,
-        linkedin,
-        twitter,
-        github,
+        websiteUrl,
+        linkedinUrl,
+        twitterUrl,
+        githubUrl,
         avatarUrl,
-        coverUrl,
         handleBase: username
             ? username.split('_').slice(0, -1).join('_')
             : (name ? name.split(' ')[0].toLowerCase() : '')
     })
 
     useEffect(() => {
-        if (!isAuthenticated) {
+        if (!isLoading && !isAuthenticated) {
             router.push('/auth')
         }
-    }, [isAuthenticated, router])
+    }, [isAuthenticated, isLoading, router])
 
     useEffect(() => {
         if (user) {
-            setSocialForm({ linkedin: user.linkedin || '', twitter: user.twitter || '', github: user.github || '' })
+            setSocialForm({ linkedinUrl: user.linkedinUrl || '', twitterUrl: user.twitterUrl || '', githubUrl: user.githubUrl || '' })
             setEditForm({
                 name: user.name || '',
                 role: user.role || '',
                 city: user.city || '',
                 bio: user.bio || '',
-                website: user.website || '',
-                linkedin: user.linkedin || '',
-                twitter: user.twitter || '',
-                github: user.github || '',
+                websiteUrl: user.websiteUrl || '',
+                linkedinUrl: user.linkedinUrl || '',
+                twitterUrl: user.twitterUrl || '',
+                githubUrl: user.githubUrl || '',
                 avatarUrl: user.avatarUrl || null,
-                coverUrl: user.coverUrl || null,
                 handleBase: user.username ? user.username.split('_').slice(0, -1).join('_') : user.name.split(' ')[0]?.toLowerCase() || ''
             })
         }
     }, [user])
 
     const fileInputRef = useRef<HTMLInputElement>(null)
-    const logoInputRef = useRef<HTMLInputElement>(null)
-
-    const handleUpload = (type: 'profile' | 'logo') => {
-        if (type === 'profile') fileInputRef.current?.click()
-        else logoInputRef.current?.click()
-    }
-
-    const handleRemove = (type: 'profile' | 'logo') => {
-        if (type === 'profile') setEditForm(prev => ({ ...prev, avatarUrl: null }))
-        else setEditForm(prev => ({ ...prev, coverUrl: null }))
-    }
-
-    const onFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'profile' | 'logo') => {
+    const onFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'profile') => {
         const file = e.target.files?.[0]
         if (file) {
             const url = URL.createObjectURL(file)
-            if (type === 'profile') setEditForm(prev => ({ ...prev, avatarUrl: url }))
-            else setEditForm(prev => ({ ...prev, coverUrl: url }))
+            setEditForm(prev => ({ ...prev, avatarUrl: url }))
         }
     }
 
     const handleSave = () => {
+        if (editForm.websiteUrl && !isValidUrl(editForm.websiteUrl)) {
+            alert('Invalid Website URL')
+            return
+        }
         const formattedRole = editForm.role.toLowerCase().trim().replace(/[\s/]+/g, '').replace(/[^a-z0-9]+/g, '')
         const formattedBase = editForm.handleBase.toLowerCase().trim().replace(/\s+/g, '_').replace(/[^a-z0-9_]+/g, '')
         const newUsername = `${formattedBase}_${formattedRole}`
@@ -145,10 +133,10 @@ export default function UserProfile() {
                 role: user.role || '', 
                 city: user.city || '', 
                 bio: user.bio || '', 
-                website: user.website || '', 
-                linkedin: user.linkedin || '', 
-                twitter: user.twitter || '', 
-                github: user.github || '', 
+                websiteUrl: user.websiteUrl || '', 
+                linkedinUrl: user.linkedinUrl || '', 
+                twitterUrl: user.twitterUrl || '', 
+                githubUrl: user.githubUrl || '', 
                 avatarUrl: user.avatarUrl || null, 
                 coverUrl: user.coverUrl || null, 
                 handleBase: user.username ? user.username.split('_').slice(0, -1).join('_') : user.name.split(' ')[0]?.toLowerCase() || '' 
@@ -157,12 +145,40 @@ export default function UserProfile() {
         setIsEditing(false)
     }
 
+    const [socialError, setSocialError] = useState('')
+
+    const isValidUrl = (url: string) => {
+        if (!url) return true // Allow empty
+        try {
+            new URL(url.startsWith('http') ? url : `https://${url}`)
+            return true
+        } catch (_) {
+            return false
+        }
+    }
+
     const handleSaveSocial = () => {
-        updateUser({ linkedin: socialForm.linkedin, twitter: socialForm.twitter, github: socialForm.github })
+        if (!isValidUrl(socialForm.linkedinUrl)) {
+            setSocialError('Invalid LinkedIn URL')
+            return
+        }
+        if (!isValidUrl(socialForm.githubUrl)) {
+            setSocialError('Invalid GitHub URL')
+            return
+        }
+        // Twitter can be a handle or URL, but user said "only accept links"
+        if (socialForm.twitterUrl && !isValidUrl(socialForm.twitterUrl)) {
+            setSocialError('Invalid Twitter URL')
+            return
+        }
+
+        setSocialError('')
+        updateUser({ linkedinUrl: socialForm.linkedinUrl, twitterUrl: socialForm.twitterUrl, githubUrl: socialForm.githubUrl })
         setIsEditingSocial(false)
     }
 
     const handleCancelSocial = () => {
+        setSocialError('')
         if (user) {
             setSocialForm({ linkedin: user.linkedin || '', twitter: user.twitter || '', github: user.github || '' })
         }
@@ -177,7 +193,6 @@ export default function UserProfile() {
                 <Sidebar />
 
                 <input type="file" ref={fileInputRef} className="hidden" onChange={(e) => onFileChange(e, 'profile')} accept="image/*" />
-                <input type="file" ref={logoInputRef} className="hidden" onChange={(e) => onFileChange(e, 'logo')} accept="image/*" />
 
                 <main className="flex-1 max-w-[680px] border-r border-border min-h-screen p-0">
 
@@ -244,7 +259,7 @@ export default function UserProfile() {
                                     <>
                                         <div className="flex items-center gap-2 mb-0.5">
                                             <h1 className="text-2xl font-display">{name}</h1>
-                                            {isVerified && <BadgeCheck className="w-5 h-5 fill-black text-white" />}
+                                            {(isVerified || subscription !== 'Free') && <BadgeCheck className="w-5 h-5 fill-primary text-white" />}
                                         </div>
                                         <p className="text-text-secondary text-sm font-medium mb-1 flex items-center gap-2">
                                             {role} • {city}
@@ -427,7 +442,7 @@ export default function UserProfile() {
                             <h3 className="font-display text-xl">Social Nodes</h3>
                             {!isEditingSocial ? (
                                 <button
-                                    onClick={() => { setSocialForm({ linkedin, twitter, github }); setIsEditingSocial(true); }}
+                                    onClick={() => { setSocialForm({ linkedinUrl, twitterUrl, githubUrl }); setIsEditingSocial(true); }}
                                     className="p-1.5 rounded-lg hover:bg-surface-2 text-text-muted hover:text-primary transition-all"
                                     title="Edit social links"
                                 >
@@ -447,27 +462,32 @@ export default function UserProfile() {
 
                         {isEditingSocial ? (
                             <div className="space-y-4">
+                                {socialError && (
+                                    <div className="p-2 bg-red-50 border border-red-100 rounded text-[10px] text-red-500 font-bold uppercase tracking-tight">
+                                        {socialError}
+                                    </div>
+                                )}
                                 <div>
                                     <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted mb-1 block">LinkedIn URL</label>
                                     <div className="relative">
                                         <Linkedin className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
                                         <input
-                                            value={socialForm.linkedin}
-                                            onChange={(e) => setSocialForm({ ...socialForm, linkedin: e.target.value })}
+                                            value={socialForm.linkedinUrl}
+                                            onChange={(e) => { setSocialForm({ ...socialForm, linkedinUrl: e.target.value }); if (socialError) setSocialError(''); }}
                                             placeholder="https://linkedin.com/in/yourprofile"
-                                            className="w-full bg-surface-1 border border-border p-2 pl-8 rounded-lg text-xs focus:ring-1 focus:ring-primary outline-none"
+                                            className="w-full bg-surface-1 border border-border p-2 pl-8 rounded-lg text-xs focus:ring-1 focus:ring-primary outline-none text-black"
                                         />
                                     </div>
                                 </div>
                                 <div>
-                                    <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted mb-1 block">Twitter (X) Handle</label>
+                                    <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted mb-1 block">Twitter (X) URL</label>
                                     <div className="relative">
                                         <Twitter className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
                                         <input
-                                            value={socialForm.twitter}
-                                            onChange={(e) => setSocialForm({ ...socialForm, twitter: e.target.value })}
-                                            placeholder="@yourhandle"
-                                            className="w-full bg-surface-1 border border-border p-2 pl-8 rounded-lg text-xs focus:ring-1 focus:ring-primary outline-none"
+                                            value={socialForm.twitterUrl}
+                                            onChange={(e) => { setSocialForm({ ...socialForm, twitterUrl: e.target.value }); if (socialError) setSocialError(''); }}
+                                            placeholder="https://twitter.com/yourhandle"
+                                            className="w-full bg-surface-1 border border-border p-2 pl-8 rounded-lg text-xs focus:ring-1 focus:ring-primary outline-none text-black"
                                         />
                                     </div>
                                 </div>
@@ -476,62 +496,62 @@ export default function UserProfile() {
                                     <div className="relative">
                                         <Github className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
                                         <input
-                                            value={socialForm.github}
-                                            onChange={(e) => setSocialForm({ ...socialForm, github: e.target.value })}
+                                            value={socialForm.githubUrl}
+                                            onChange={(e) => { setSocialForm({ ...socialForm, githubUrl: e.target.value }); if (socialError) setSocialError(''); }}
                                             placeholder="https://github.com/yourusername"
-                                            className="w-full bg-surface-1 border border-border p-2 pl-8 rounded-lg text-xs focus:ring-1 focus:ring-primary outline-none"
+                                            className="w-full bg-surface-1 border border-border p-2 pl-8 rounded-lg text-xs focus:ring-1 focus:ring-primary outline-none text-black"
                                         />
                                     </div>
                                 </div>
                             </div>
                         ) : (
                             <div className="space-y-6">
-                                {linkedin ? (
-                                    <Link href={formatURL(linkedin)} target="_blank" className="flex items-center gap-4 group">
-                                        <div className="w-10 h-10 bg-surface-2 rounded-xl flex items-center justify-center border border-border group-hover:bg-primary group-hover:text-white transition-all">
+                                {linkedinUrl ? (
+                                    <Link href={formatURL(linkedinUrl)} target="_blank" className="flex items-center gap-4 group">
+                                        <div className="w-10 h-10 bg-surface-2 rounded-xl flex items-center justify-center border border-border group-hover:bg-primary group-hover:text-white transition-all text-black">
                                             <Linkedin className="w-5 h-5" />
                                         </div>
                                         <div className="overflow-hidden">
                                             <p className="text-[10px] font-bold uppercase text-text-muted">LinkedIn</p>
-                                            <p className="text-sm font-medium truncate">{extractHandle(linkedin, '')}</p>
+                                            <p className="text-sm font-bold truncate text-black">{extractHandle(linkedinUrl, '')}</p>
                                         </div>
                                     </Link>
                                 ) : (
-                                    <div className="flex items-center gap-4 opacity-40">
+                                    <div className="flex items-center gap-4 opacity-40 text-black">
                                         <div className="w-10 h-10 bg-surface-2 rounded-xl flex items-center justify-center border border-border"><Linkedin className="w-5 h-5" /></div>
-                                        <p className="text-xs text-text-muted italic">No LinkedIn added</p>
+                                        <p className="text-xs italic">No LinkedIn added</p>
                                     </div>
                                 )}
-                                {twitter ? (
-                                    <Link href={formatURL(`twitter.com/${twitter.replace('@', '')}`)} target="_blank" className="flex items-center gap-4 group">
-                                        <div className="w-10 h-10 bg-surface-2 rounded-xl flex items-center justify-center border border-border group-hover:bg-black group-hover:text-white transition-all">
+                                {twitterUrl ? (
+                                    <Link href={formatURL(twitterUrl.startsWith('http') ? twitterUrl : `twitter.com/${twitterUrl.replace('@', '')}`)} target="_blank" className="flex items-center gap-4 group">
+                                        <div className="w-10 h-10 bg-surface-2 rounded-xl flex items-center justify-center border border-border group-hover:bg-black group-hover:text-white transition-all text-black">
                                             <Twitter className="w-5 h-5" />
                                         </div>
                                         <div className="overflow-hidden">
                                             <p className="text-[10px] font-bold uppercase text-text-muted">Twitter</p>
-                                            <p className="text-sm font-medium truncate">{twitter.startsWith('@') ? twitter : `@${twitter}`}</p>
+                                            <p className="text-sm font-bold truncate text-black">{twitterUrl.startsWith('http') ? extractHandle(twitterUrl) : (twitterUrl.startsWith('@') ? twitterUrl : `@${twitterUrl}`)}</p>
                                         </div>
                                     </Link>
                                 ) : (
-                                    <div className="flex items-center gap-4 opacity-40">
+                                    <div className="flex items-center gap-4 opacity-40 text-black">
                                         <div className="w-10 h-10 bg-surface-2 rounded-xl flex items-center justify-center border border-border"><Twitter className="w-5 h-5" /></div>
-                                        <p className="text-xs text-text-muted italic">No Twitter added</p>
+                                        <p className="text-xs italic">No Twitter added</p>
                                     </div>
                                 )}
-                                {github ? (
-                                    <Link href={formatURL(github)} target="_blank" className="flex items-center gap-4 group">
-                                        <div className="w-10 h-10 bg-surface-2 rounded-xl flex items-center justify-center border border-border group-hover:bg-black group-hover:text-white transition-all">
+                                {githubUrl ? (
+                                    <Link href={formatURL(githubUrl)} target="_blank" className="flex items-center gap-4 group">
+                                        <div className="w-10 h-10 bg-surface-2 rounded-xl flex items-center justify-center border border-border group-hover:bg-black group-hover:text-white transition-all text-black">
                                             <Github className="w-5 h-5" />
                                         </div>
                                         <div className="overflow-hidden">
                                             <p className="text-[10px] font-bold uppercase text-text-muted">GitHub</p>
-                                            <p className="text-sm font-medium truncate">{extractHandle(github, '')}</p>
+                                            <p className="text-sm font-bold truncate text-black">{extractHandle(githubUrl, '')}</p>
                                         </div>
                                     </Link>
                                 ) : (
-                                    <div className="flex items-center gap-4 opacity-40">
+                                    <div className="flex items-center gap-4 opacity-40 text-black">
                                         <div className="w-10 h-10 bg-surface-2 rounded-xl flex items-center justify-center border border-border"><Github className="w-5 h-5" /></div>
-                                        <p className="text-xs text-text-muted italic">No GitHub added</p>
+                                        <p className="text-xs italic">No GitHub added</p>
                                     </div>
                                 )}
                             </div>

@@ -19,8 +19,11 @@ public class FirebaseAuthFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getServletPath();
-        // ← Add all public endpoints here — filter will skip them
-        return path.equals("/api/auth/forgot-password");
+        String uri = request.getRequestURI();
+        return path.equals("/api/auth/forgot-password") || 
+               path.startsWith("/api/search") || 
+               path.startsWith("/api/users") ||
+               uri.contains("/api/search");
     }
 
     // do the filter for mapping

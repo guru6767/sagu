@@ -54,6 +54,9 @@ public class SecurityConfig {
                                 "/api/subscriptions/webhook/razorpay",
                                 "/api/subscriptions/create",
                                 "/api/subscriptions/verify",
+                                "/api/search",
+                                "/api/search/**",
+                                "/api/users/**",
                                 "/actuator/health")
                         .permitAll() // Public routes
                         .anyRequest().authenticated())

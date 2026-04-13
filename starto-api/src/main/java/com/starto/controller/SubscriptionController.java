@@ -50,6 +50,30 @@ public class SubscriptionController {
         }
     }
 
+    // Manual upgrade bypass (for testing/direct upgrade buttons)
+    @PostMapping("/upgrade")
+    public ResponseEntity<?> manualUpgrade(
+            Authentication authentication,
+            @RequestBody Map<String, String> body) {
+        
+        if (authentication == null)
+            return ResponseEntity.status(401).build();
+
+        try {
+            String firebaseUid = authentication.getPrincipal().toString();
+            String plan = body.get("plan");
+            
+            if (plan == null || (!plan.equalsIgnoreCase("Pro") && !plan.equalsIgnoreCase("Founder") && !plan.equalsIgnoreCase("Free"))) {
+                return ResponseEntity.status(400).body(Map.of("error", "Invalid plan type"));
+            }
+
+            subscriptionService.upgradeUserPlan(firebaseUid, plan, 12); // Give 1 year for manual upgrade
+            return ResponseEntity.ok(Map.of("message", "Plan upgraded successfully to " + plan, "plan", plan));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
+        }
+    }
+
     // Razorpay calls this automatically every month
     @PostMapping("/webhook/razorpay")
     public ResponseEntity<Void> handleRazorpayWebhook(

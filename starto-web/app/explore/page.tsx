@@ -48,21 +48,11 @@ export default function StartoAIExplore() {
                                     </div>
                                     <div>
                                         <label className="text-xs font-bold uppercase tracking-widest text-text-muted mb-2 block">What sector are you in?</label>
-                                        <select className="w-full bg-surface-2 p-3 rounded-md border border-border outline-none focus:border-primary">
-                                            <option>AgriTech</option>
-                                            <option>EdTech</option>
-                                            <option>FinTech</option>
-                                            <option>HealthTech</option>
-                                        </select>
+                                        <input type="text" placeholder="e.g. AgriTech, FinTech" className="w-full bg-surface-2 p-3 rounded-md border border-border outline-none focus:border-primary" />
                                     </div>
                                     <div>
                                         <label className="text-xs font-bold uppercase tracking-widest text-text-muted mb-2 block">What is your initial budget?</label>
-                                        <select className="w-full bg-surface-2 p-3 rounded-md border border-border outline-none focus:border-primary">
-                                            <option>Under ₹1L</option>
-                                            <option>₹1L - ₹5L</option>
-                                            <option>₹5L - ₹25L</option>
-                                            <option>₹25L - ₹1Cr</option>
-                                        </select>
+                                        <input type="text" placeholder="e.g. ₹10L - ₹50L" className="w-full bg-surface-2 p-3 rounded-md border border-border outline-none focus:border-primary" />
                                     </div>
                                 </div>
 

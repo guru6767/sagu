@@ -48,9 +48,14 @@ export const useLocalUserStore = create<LocalUserStore>()(
             users: [],
 
             registerUser: ({ email, password, name, role, bio, city, phone, username, avatarSeed }) => {
-                const existing = get().users.find(u => u.email.toLowerCase() === email.toLowerCase())
-                if (existing) {
+                const existingEmail = get().users.find(u => u.email.toLowerCase() === email.toLowerCase())
+                if (existingEmail) {
                     return { success: false, error: 'An account with this email already exists. Please login.' }
+                }
+
+                const existingPhone = get().users.find(u => u.phone === phone)
+                if (existingPhone) {
+                    return { success: false, error: 'Mobile number already registered.' }
                 }
 
                 const newUser: LocalUserRecord = {

@@ -66,15 +66,37 @@ export default function SubscriptionPage() {
 
     const subscription = user?.subscription || 'Free'
 
-    const handleUpgrade = (planName: string) => {
+    const handleUpgrade = async (planName: string) => {
         if (planName === subscription) return
 
-        // Simulate checkout process
-        const confirm = window.confirm(`Confirm upgrade to ${planName} plan?`)
-        if (confirm) {
-            updateUser({ subscription: planName as 'Free' | 'Pro' | 'Founder' })
-            alert(`Welcome to ${planName}! Your verified badge is now active.`)
-            router.push('/profile')
+        const confirmUpgrade = window.confirm(`Confirm upgrade to ${planName} plan?`)
+        if (!confirmUpgrade) return
+
+        try {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081'}/api/subscriptions/upgrade`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${useAuthStore.getState().token}`
+                },
+                body: JSON.stringify({ plan: planName })
+            })
+
+            if (response.ok) {
+                const data = await response.json()
+                updateUser({ 
+                    plan: data.plan,
+                    subscription: data.plan // Keep both in sync for UI stability
+                })
+                alert(`Welcome to ${planName}! Your verified badge is now active.`)
+                router.push('/profile')
+            } else {
+                const errorData = await response.json()
+                alert(errorData.error || 'Failed to upgrade. Please try again later.')
+            }
+        } catch (error) {
+            console.error('Upgrade error:', error)
+            alert('A network error occurred. Please try again.')
         }
     }
 

@@ -103,7 +103,7 @@ function CommentRow({ comment, signalId, currentUser, depth = 0 }: {
     return (
         <div className={`flex gap-2 ${textSize}`}>
             <div className={`${avatarSize} rounded-full bg-surface-2 overflow-hidden shrink-0 mt-0.5 relative`}>
-                <Image src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${comment.username}`} alt={comment.username} fill className="object-cover" />
+                <Image src={`https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(comment.username)}`} alt={comment.username} fill className="object-cover" />
             </div>
             <div className="flex-1 min-w-0">
                 <p>
@@ -173,13 +173,15 @@ interface SignalCardProps {
         offers: number
         views: number
     }
+    hideViews?: boolean
+    userPlan?: string
 }
 
-export default function SignalCard({ id, title, username, timeAgo, category, description, strength, stats }: SignalCardProps) {
-    const { user } = useAuthStore()
+export default function SignalCard({ id, title, username, timeAgo, category, description, strength, stats, hideViews = false, userPlan = 'free' }: SignalCardProps) {
+    const { user, token } = useAuthStore()
     const currentUser = user?.username
     const { deleteSignal, signals } = useSignalStore()
-    const { isConnected, sendRequest, hasPendingRequest } = useNetworkStore()
+    const { connections, sentRequests, pendingRequests, sendRequest } = useNetworkStore()
     const { addResponse, hasResponded } = useResponseStore()
     const [showDropdown, setShowDropdown] = useState(false)
     const [isEditModalOpen, setIsEditModalOpen] = useState(false)
@@ -190,8 +192,12 @@ export default function SignalCard({ id, title, username, timeAgo, category, des
     const [addedToNetwork, setAddedToNetwork] = useState(false)
     const [justResponded, setJustResponded] = useState(false)
     const dropdownRef = useRef<HTMLDivElement>(null)
-    const alreadyConnected = isConnected(username)
-    const alreadyPending = hasPendingRequest(username)
+    const safeConnections = Array.isArray(connections) ? connections : []
+    const safeSent = Array.isArray(sentRequests) ? sentRequests : []
+    const safePending = Array.isArray(pendingRequests) ? pendingRequests : []
+
+    const alreadyConnected = safeConnections.some(c => c.username === username)
+    const alreadyPending = safeSent.some(r => r.username === username && r.status === 'pending')
     const alreadyResponded = hasResponded(id)
 
     useEffect(() => {
@@ -209,7 +215,7 @@ export default function SignalCard({ id, title, username, timeAgo, category, des
     // Days left calculation
     const totalDuration = parseInt(strength) || 7;
     // Determine creation time, defaulting to 1 day ago if legacy signal created before this feature
-    const safeCreatedAt = currentSignal?.createdAt || (Date.now() - (1000 * 60 * 60 * 24));
+    const safeCreatedAt = currentSignal?.createdAt ? new Date(currentSignal.createdAt).getTime() : (Date.now() - (1000 * 60 * 60 * 24));
     const daysElapsed = Math.floor((Date.now() - safeCreatedAt) / (1000 * 60 * 60 * 24));
     const daysLeft = Math.max(0, totalDuration - daysElapsed);
     const strengthColor: Record<string, string> = {
@@ -219,6 +225,13 @@ export default function SignalCard({ id, title, username, timeAgo, category, des
         Low: 'bg-text-muted'
     }
     const colorClass = strengthColor[strength] || 'bg-text-muted'
+    
+    // Social Proof: Show if a connection has responded, or the user themselves
+    const connectionRespondent = currentSignal?.comments?.find(c => 
+        safeConnections.some(conn => conn.username === c.username)
+    )?.username;
+
+    const respondentToShow = connectionRespondent || (currentSignal?.comments?.some(c => c.username === currentUser) ? currentUser : null);
 
     return (
         <motion.div
@@ -229,15 +242,19 @@ export default function SignalCard({ id, title, username, timeAgo, category, des
             <div className="flex justify-between items-start mb-4">
                 <Link href={`/profile/${username}`} className="flex items-center gap-3 group/profile hover:opacity-80 transition-opacity">
                     <div className="w-10 h-10 bg-surface-2 rounded-full border border-border relative overflow-hidden">
-                        <Image src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`} alt={username} fill className="object-cover" />
+                        <Image src={`https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(username)}`} alt={username} fill className="object-cover" />
                     </div>
                     <div>
-                        <div className="flex items-center gap-1.5">
-                            <span className="font-bold text-sm text-black group-hover/profile:text-primary transition-colors cursor-pointer">{formatUsername(username)}</span>
-                            <span className={`w-1.5 h-1.5 rounded-full ${colorClass}`} />
-                            <span className="text-xs text-text-muted">{strength}</span>
-                        </div>
-                        <p className="text-xs text-text-muted">{timeAgo}</p>
+                    <div className="flex items-center gap-2 overflow-hidden">
+                        <span className="text-sm font-bold truncate hover:underline cursor-pointer">{username}</span>
+                        {(userPlan === 'Pro' || userPlan === 'Founder' || userPlan?.toLowerCase() === 'premium') && (
+                            <div className="text-primary" title="Verified Member">
+                                <BadgeCheck className="w-4 h-4" />
+                            </div>
+                        )}
+                        <span className="text-text-muted text-xs shrink-0">•</span>
+                        <span className="text-text-muted text-[10px] font-bold uppercase tracking-widest shrink-0">{timeAgo}</span>
+                    </div>
                     </div>
                 </Link>
                 <div className="flex items-center gap-2">
@@ -288,8 +305,10 @@ export default function SignalCard({ id, title, username, timeAgo, category, des
                 </div>
             </div>
 
-            <h3 className="text-lg font-medium mb-2 group-hover:underline cursor-pointer">{title}</h3>
-            <p className="text-text-secondary text-sm mb-4 line-clamp-2">{description}</p>
+            <Link href={`/signals/${id}`} className="block group/link cursor-pointer">
+                <h3 className="text-lg font-medium mb-2 group-hover/link:text-primary group-hover/link:underline transition-colors">{title}</h3>
+                <p className="text-text-secondary text-sm mb-4 line-clamp-2">{description}</p>
+            </Link>
 
             <div className="flex items-center gap-6 mb-5">
                 <div className="flex flex-col">
@@ -300,10 +319,12 @@ export default function SignalCard({ id, title, username, timeAgo, category, des
                     <span className="text-[10px] text-text-muted uppercase">Offers</span>
                     <span className="font-mono text-sm">{stats.offers}</span>
                 </div>
-                <div className="flex flex-col">
-                    <span className="text-[10px] text-text-muted uppercase">Views</span>
-                    <span className="font-mono text-sm">{stats.views}</span>
-                </div>
+                {!hideViews && (
+                    <div className="flex flex-col">
+                        <span className="text-[10px] text-text-muted uppercase">Views</span>
+                        <span className="font-mono text-sm">{stats.views}</span>
+                    </div>
+                )}
             </div>
             
             {/* Urgency Progress Bar */}
@@ -330,6 +351,21 @@ export default function SignalCard({ id, title, username, timeAgo, category, des
                 <div className="clear-both" />
             </div>
 
+            {/* Social Proof Line */}
+            {respondentToShow && (
+                <div className="mb-4 flex items-center gap-2">
+                    <div className="flex -space-x-2">
+                        <div className="w-5 h-5 rounded-full border border-white bg-surface-2 relative overflow-hidden">
+                            <Image src={`https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(respondentToShow)}`} alt="proof" fill className="object-cover" />
+                        </div>
+                    </div>
+                    <p className="text-[11px] text-text-secondary">
+                        Responded by <span className="font-bold text-black border-b border-black/20">{respondentToShow === currentUser ? 'you' : `@${respondentToShow}`}</span>
+                        {stats.responses > 1 && ` and ${stats.responses - 1} others`}
+                    </p>
+                </div>
+            )}
+
             {/* Actions */}
 
             <div className="flex gap-2">
@@ -348,11 +384,19 @@ export default function SignalCard({ id, title, username, timeAgo, category, des
                     Respond
                 </button>
                 <button
-                    onClick={() => {
+                    onClick={async () => {
                         if (!isOwner && !alreadyConnected && !alreadyPending && !addedToNetwork) {
-                            sendRequest({ username, category, timeAdded: Date.now() });
-                            setAddedToNetwork(true);
-                            setTimeout(() => setAddedToNetwork(false), 2000);
+                            if (!token) {
+                                alert('Please login to connect');
+                                return;
+                            }
+                            try {
+                                await sendRequest(id, 'I want to connect!', token);
+                                setAddedToNetwork(true);
+                                setTimeout(() => setAddedToNetwork(false), 2000);
+                            } catch (err) {
+                                // Error handled in store or already alerted
+                            }
                         }
                     }}
                     disabled={isOwner}
@@ -406,7 +450,7 @@ export default function SignalCard({ id, title, username, timeAgo, category, des
                         {/* Main Comment Input */}
                         <div className="mt-4 flex gap-2 items-center border-t border-border pt-3">
                             <div className="w-8 h-8 rounded-full bg-surface-2 overflow-hidden shrink-0 relative">
-                                <Image src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser || 'user'}`} alt="me" fill className="object-cover" />
+                                <Image src={`https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(currentUser || 'user')}`} alt="me" fill className="object-cover" />
                             </div>
                             <input
                                 type="text"

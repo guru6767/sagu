@@ -46,7 +46,7 @@ export const useSignalStore = create<SignalState>()(
             addSignal: (newSignal) => set((state) => {
                 const signal: Signal = {
                     ...newSignal,
-                    id: Math.random().toString(36).substring(7),
+                    id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(7),
                     status: 'Active',
                     stats: { responses: 0, offers: 0, views: 0 },
                     createdAt: Date.now()

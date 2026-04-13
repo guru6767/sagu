@@ -4,22 +4,35 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Sidebar from '@/components/feed/Sidebar'
 import SignalCard from '@/components/feed/SignalCard'
-import { Plus, Search, Loader2, WifiOff, RefreshCw } from 'lucide-react'
+import { Plus, Search, Loader2, WifiOff, RefreshCw, X } from 'lucide-react'
 import RaiseSignalModal from '@/components/feed/RaiseSignalModal'
-import { useSignalStore } from '@/store/useSignalStore'
+import { useSignalStore, Signal } from '@/store/useSignalStore'
 import { useAuthStore } from '@/store/useAuthStore'
+import { useNetworkStore } from '@/store/useNetworkStore'
+import { useSearchStore } from '@/store/useSearchStore'
 import { signalsApi, ApiSignal } from '@/lib/apiClient'
+import SearchResultsPanel from '@/components/feed/SearchResultsPanel'
+
+function formatInstagramTime(createdAt?: string) {
+    const createdMs = createdAt ? new Date(createdAt).getTime() : 0;
+    if (!createdMs) return 'now';
+    const diffMs = Math.max(0, Date.now() - createdMs);
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHrs = Math.floor(diffMin / 60);
+    const diffDays = Math.floor(diffHrs / 24);
+    const diffWeeks = Math.floor(diffDays / 7);
+
+    if (diffWeeks > 0) return `${diffWeeks}w`;
+    if (diffDays > 0) return `${diffDays}d`;
+    if (diffHrs > 0) return `${diffHrs}h`;
+    if (diffMin > 0) return `${diffMin}m`;
+    return 'now';
+}
 
 // Map backend ApiSignal → the shape SignalCard expects
 function mapApiSignalToCard(s: ApiSignal) {
-    const createdAt = s.createdAt ? new Date(s.createdAt) : new Date()
-    const diffMs = Date.now() - createdAt.getTime()
-    const diffMin = Math.floor(diffMs / 60000)
-    const timeAgo =
-        diffMin < 1 ? 'Just now'
-        : diffMin < 60 ? `${diffMin}m ago`
-        : diffMin < 1440 ? `${Math.floor(diffMin / 60)}h ago`
-        : `${Math.floor(diffMin / 1440)}d ago`
+    const timeAgo = formatInstagramTime(s.createdAt);
 
     return {
         id: s.id,
@@ -34,6 +47,7 @@ function mapApiSignalToCard(s: ApiSignal) {
             offers: s.offerCount ?? 0,
             views: s.viewCount ?? 0,
         },
+        userPlan: s.userPlan || 'free',
     }
 }
 
@@ -41,6 +55,8 @@ export default function HomeFeed() {
     const router = useRouter()
     const { isAuthenticated } = useAuthStore()
     const { signals: localSignals } = useSignalStore()
+    const { connections, sentRequests, pendingRequests, sendRequest } = useNetworkStore()
+    const { query, setQuery, performSearch, clearSearch } = useSearchStore()
 
     // ── Backend signal state ──────────────────────────────────────────────────
     const [apiSignals, setApiSignals] = useState<ApiSignal[]>([])
@@ -48,6 +64,16 @@ export default function HomeFeed() {
     const [backendError, setBackendError] = useState<string | null>(null)
     const [isRaiseModalOpen, setIsRaiseModalOpen] = useState(false)
     const [refreshKey, setRefreshKey] = useState(0)
+
+    // Debounced search
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (query.length >= 2) {
+                performSearch(query)
+            }
+        }, 300)
+        return () => clearTimeout(timer)
+    }, [query, performSearch])
 
     useEffect(() => {
         let cancelled = false
@@ -90,6 +116,7 @@ export default function HomeFeed() {
             description: s.description,
             strength: s.strength,
             stats: s.stats,
+            userPlan: 'free',
         })),
     ]
 
@@ -98,42 +125,58 @@ export default function HomeFeed() {
             <div className="max-w-[1400px] w-full flex">
                 <Sidebar />
 
-                <main className="flex-1 max-w-[680px] border-r border-border min-h-screen p-6">
-                    {/* Header */}
-                    <div className="flex justify-between items-center mb-6">
-                        <div className="flex items-center gap-3">
-                            <h1 className="text-2xl font-display">Feed</h1>
-                            {/* Backend status badge */}
-                            {!loading && (
-                                backendError ? (
-                                    <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-orange-500 border border-orange-200 bg-orange-50 px-2 py-0.5 rounded-full">
-                                        <WifiOff className="w-3 h-3" /> Local Mode
-                                    </span>
-                                ) : (
-                                    <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-green-600 border border-green-200 bg-green-50 px-2 py-0.5 rounded-full">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                                        Live — {apiSignals.length} signals
-                                    </span>
-                                )
+                {/* Signals Feed */}
+                <main className="flex-1 max-w-2xl px-4 py-8 overflow-y-auto border-r border-border min-h-screen">
+                    <header className="mb-8 flex justify-between items-center bg-background/90 backdrop-blur-md sticky top-0 z-20 py-4 -mx-4 px-4 border-b border-border shadow-sm">
+                        <div className="flex items-center gap-4">
+                            <h1 className="text-2xl font-bold font-display tracking-tight text-black">Signals Feed</h1>
+                            
+                            {/* Backend status and local mode notice moved into header for compactness */}
+                            {!loading && backendError && (
+                                <span className="flex items-center gap-1 text-[9px] font-extrabold uppercase tracking-tighter text-orange-600 border border-orange-200 bg-orange-50/80 px-2 py-0.5 rounded-full whitespace-nowrap">
+                                    <WifiOff className="w-2.5 h-2.5" /> Local
+                                </span>
                             )}
                         </div>
-                        <div className="flex gap-2 items-center">
+                        
+                        <div className="flex gap-2 items-center flex-1 justify-end max-w-md ml-4">
+                            <div className="relative group flex-1">
+                                <div className="relative">
+                                    <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors ${query ? 'text-primary' : 'text-text-muted'}`} />
+                                    <input 
+                                        type="text"
+                                        placeholder="Search signals..."
+                                        value={query}
+                                        onChange={(e) => setQuery(e.target.value)}
+                                        className="pl-9 pr-4 py-2 bg-white/50 border border-border rounded-full text-sm focus:outline-none focus:border-primary/40 focus:ring-4 focus:ring-primary/5 w-full transition-all"
+                                    />
+                                    {query && (
+                                        <button 
+                                            onClick={clearSearch}
+                                            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-border/50 rounded-full"
+                                        >
+                                            <X className="w-3 h-3 text-text-muted" />
+                                        </button>
+                                    )}
+                                </div>
+                                <SearchResultsPanel />
+                            </div>
                             <button
                                 onClick={() => setRefreshKey(k => k + 1)}
-                                title="Refresh from backend"
-                                className="p-2 border border-border rounded-md hover:bg-surface-2 transition-all"
+                                title="Refresh"
+                                className="p-2 border border-border rounded-full hover:bg-surface-2 transition-all shrink-0 bg-white"
                             >
-                                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                                <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
                             </button>
                             <button
                                 onClick={() => requireAuth(() => setIsRaiseModalOpen(true))}
-                                className="bg-primary text-white px-4 py-2 rounded-md flex items-center gap-2 hover:opacity-90 transition-all"
+                                className="bg-black text-white px-4 py-2 rounded-full flex items-center gap-2 hover:bg-black/90 transition-all shrink-0 shadow-sm"
                             >
-                                <Plus className="w-5 h-5" />
-                                <span className="text-sm font-medium">Raise Signal</span>
+                                <Plus className="w-4 h-4" />
+                                <span className="text-xs font-bold uppercase tracking-widest hidden sm:inline">Raise</span>
                             </button>
                         </div>
-                    </div>
+                    </header>
 
                     {/* Backend error notice */}
                     {backendError && (
@@ -170,6 +213,8 @@ export default function HomeFeed() {
                                         description={signal.description}
                                         strength={signal.strength}
                                         stats={signal.stats}
+                                        hideViews={true}
+                                        userPlan={signal.userPlan}
                                     />
                                 </div>
                             ))}

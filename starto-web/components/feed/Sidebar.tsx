@@ -76,7 +76,9 @@ export default function Sidebar() {
             <nav className="flex-1 space-y-1">
                 {navItems.map((item) => {
                     const Icon = item.icon
-                    const isActive = pathname === item.href || (item.href !== '/feed' && pathname.startsWith(item.href))
+                    const isActive = item.href === '/profile' 
+                        ? pathname === '/profile' 
+                        : pathname === item.href || (item.href !== '/feed' && pathname.startsWith(item.href))
 
                     return (
                         <Link

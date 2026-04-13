@@ -61,4 +61,14 @@ public interface SignalRepository extends JpaRepository<Signal, UUID> {
     // bounding-box search by geo coords
     List<Signal> findByStatusAndLatBetweenAndLngBetween(String status, java.math.BigDecimal latMin,
             java.math.BigDecimal latMax, java.math.BigDecimal lngMin, java.math.BigDecimal lngMax);
+
+    @Query("""
+            SELECT s FROM Signal s
+            JOIN s.user u
+            WHERE LOWER(s.title) LIKE LOWER(CONCAT('%', :query, '%'))
+            OR LOWER(s.description) LIKE LOWER(CONCAT('%', :query, '%'))
+            OR LOWER(u.username) LIKE LOWER(CONCAT('%', :query, '%'))
+            OR LOWER(u.name) LIKE LOWER(CONCAT('%', :query, '%'))
+            """)
+    List<Signal> findByTitleDescriptionOrOwner(@Param("query") String query);
 }

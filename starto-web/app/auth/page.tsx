@@ -1,7 +1,11 @@
 "use client"
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Mail, AlertCircle, ArrowRight, CheckCircle } from 'lucide-react'
+import { Mail, AlertCircle, ArrowRight, CheckCircle, Eye, EyeOff } from 'lucide-react'
+import PhoneInput, { isValidPhoneNumber } from 'react-phone-number-input'
+import 'react-phone-number-input/style.css'
+import CityAutocomplete from '@/components/CityAutocomplete'
+
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/useAuthStore'
 import { useLocalUserStore } from '@/store/useLocalUserStore'
@@ -22,6 +26,9 @@ export default function AuthPage() {
     // Shared fields
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
+    const [confirmPassword, setConfirmPassword] = useState('')
+    const [showPassword, setShowPassword] = useState(false)
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false)
     const [error, setError] = useState('')
     const [loading, setLoading] = useState(false)
     const [signupSuccess, setSignupSuccess] = useState(false)
@@ -43,6 +50,9 @@ export default function AuthPage() {
         setBio('')
         setCity('')
         setPhone('')
+        setConfirmPassword('')
+        setShowPassword(false)
+        setShowConfirmPassword(false)
     }
 
     // ──────────── LOGIN ────────────
@@ -110,7 +120,7 @@ export default function AuthPage() {
                 city: u.city,
                 state: '',
                 bio: u.bio,
-                avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.avatarSeed}`,
+                avatarUrl: `https://api.dicebear.com/9.x/avataaars/svg?seed=${u.avatarSeed}`,
                 plan: 'Free',
                 signalCount: 0,
                 networkSize: 0,
@@ -146,12 +156,30 @@ export default function AuthPage() {
         setLoading(true)
         setError('')
         try {
-            if (!name.trim() || !email.trim() || !password || !role || !city.trim() || !phone.trim()) {
+            if (!name.trim() || !email.trim() || !password || !role || !city.trim() || !phone) {
                 setError('Please fill all required fields.')
                 return
             }
+
+            // Email validation regex
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+            if (!emailRegex.test(email.trim())) {
+                setError('Please enter a valid email address.')
+                return
+            }
+
             if (password.length < 8) {
                 setError('Password must be at least 8 characters.')
+                return
+            }
+
+            if (password !== confirmPassword) {
+                setError('Passwords do not match.')
+                return
+            }
+
+            if (phone && !isValidPhoneNumber(phone)) {
+                setError('Please enter a valid mobile number for the selected country.')
                 return
             }
 
@@ -184,11 +212,11 @@ export default function AuthPage() {
     }
 
     return (
-        <div className="min-h-screen bg-[#0A0A0A] flex flex-col items-center justify-center p-6 text-white text-center selection:bg-white selection:text-black">
+        <div className="auth-theme min-h-screen bg-black flex flex-col items-center justify-center p-6 text-white text-center selection:bg-white selection:text-black">
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="max-w-md w-full bg-white/[0.02] border border-white/5 p-8 rounded-2xl shadow-xl"
+                className="max-w-md w-full bg-white/[0.05] border border-white/10 p-8 rounded-2xl shadow-xl"
             >
                 <h1 className="text-4xl font-bold mb-2 tracking-tight">Starto</h1>
                 <p className="text-gray-400 mb-8 text-sm">Where Ecosystems Connect.</p>
@@ -226,7 +254,18 @@ export default function AuthPage() {
                                 </div>
                                 <div>
                                     <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">Password</label>
-                                    <input type="password" value={password} onChange={e => setPassword(e.target.value)} required className="w-full mt-2 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-white/40 focus:bg-white/10 transition-colors" />
+                                    <div className="auth-input-container">
+                                        <input 
+                                            type={showPassword ? "text" : "password"} 
+                                            value={password} 
+                                            onChange={e => setPassword(e.target.value)} 
+                                            required 
+                                            className="w-full mt-2 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-white/40 focus:bg-white/10 transition-colors pr-12" 
+                                        />
+                                        <div className="auth-input-icon mt-1" onClick={() => setShowPassword(!showPassword)}>
+                                            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                        </div>
+                                    </div>
                                 </div>
                                 {error && <p className="text-red-500 text-xs flex items-center gap-1 font-medium"><AlertCircle className="w-3 h-3" /> {error}</p>}
                                 <button disabled={loading} type="submit" className="w-full bg-white text-black py-4 px-6 rounded-xl font-bold flex items-center justify-center gap-3 hover:bg-gray-200 transition-all mt-4 disabled:opacity-50">
@@ -257,11 +296,23 @@ export default function AuthPage() {
                             </div>
                             <div>
                                 <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">Location (City) <span className="text-red-400">*</span></label>
-                                <input type="text" value={city} onChange={e => setCity(e.target.value)} required className="w-full mt-2 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-white/40 focus:bg-white/10 transition-colors" />
+                                <CityAutocomplete value={city} onChange={setCity} />
                             </div>
                             <div>
                                 <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">Mobile Number <span className="text-red-400">*</span></label>
-                                <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} required className="w-full mt-2 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-white/40 focus:bg-white/10 transition-colors" />
+                                <PhoneInput
+                                    international
+                                    defaultCountry="IN"
+                                    value={phone}
+                                    onChange={(val) => setPhone(val || '')}
+                                    className="phone-input-custom"
+                                />
+                                {phone && phone.startsWith('+91') && phone.length > 3 && !/^\+91[6-9]\d{9}$/.test(phone) && (
+                                    <p className="text-red-500 text-[10px] mt-1 flex items-center gap-1">
+                                        <AlertCircle className="w-3 h-3" /> 
+                                        {phone.length < 13 ? "Enter 10 digits" : "Valid India numbers start with 6-9"}
+                                    </p>
+                                )}
                             </div>
                             <div>
                                 <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">Bio <span className="text-gray-600">(optional)</span></label>
@@ -275,7 +326,33 @@ export default function AuthPage() {
                                 </div>
                                 <div className="mt-4">
                                     <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">Password <span className="text-red-400">*</span></label>
-                                    <input type="password" value={password} onChange={e => setPassword(e.target.value)} required className="w-full mt-2 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-white/40 focus:bg-white/10 transition-colors" />
+                                    <div className="auth-input-container">
+                                        <input 
+                                            type={showPassword ? "text" : "password"} 
+                                            value={password} 
+                                            onChange={e => setPassword(e.target.value)} 
+                                            required 
+                                            className="w-full mt-2 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-white/40 focus:bg-white/10 transition-colors pr-12" 
+                                        />
+                                        <div className="auth-input-icon mt-1" onClick={() => setShowPassword(!showPassword)}>
+                                            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="mt-4">
+                                    <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">Confirm Password <span className="text-red-400">*</span></label>
+                                    <div className="auth-input-container">
+                                        <input 
+                                            type={showConfirmPassword ? "text" : "password"} 
+                                            value={confirmPassword} 
+                                            onChange={e => setConfirmPassword(e.target.value)} 
+                                            required 
+                                            className="w-full mt-2 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-white/40 focus:bg-white/10 transition-colors pr-12" 
+                                        />
+                                        <div className="auth-input-icon mt-1" onClick={() => setShowConfirmPassword(!showConfirmPassword)}>
+                                            {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                             {error && <p className="text-red-500 text-xs flex items-center gap-1 font-medium"><AlertCircle className="w-3 h-3" /> {error}</p>}

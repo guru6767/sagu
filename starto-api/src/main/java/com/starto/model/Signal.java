@@ -31,8 +31,7 @@ public class Signal {
     @Column(name = "user_id", insertable = false, updatable = false)
     private UUID userId;
 
-    @Formula("(SELECT u.username FROM users u WHERE u.id = user_id)")
-    private String username;
+
 
     @Column(nullable = false, length = 50)
     private String type;

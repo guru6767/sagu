@@ -63,4 +63,12 @@ public class Connection {
     public UUID getSignalId() {
         return signal != null ? signal.getId() : null;
     }
+
+    public String getRequesterUsername() {
+        return requester != null ? requester.getUsername() : null;
+    }
+
+    public String getReceiverUsername() {
+        return receiver != null ? receiver.getUsername() : null;
+    }
 }

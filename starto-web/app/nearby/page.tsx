@@ -57,7 +57,7 @@ export default function NearbyEcosystem() {
                             {[1, 2, 3, 4, 5, 6].map(i => (
                                 <div key={i} className="flex items-center gap-4 p-4 border border-border rounded-xl hover:border-text-muted cursor-pointer transition-all group">
                                     <div className="w-12 h-12 bg-surface-2 rounded-full border border-border group-hover:scale-110 transition-transform relative overflow-hidden">
-                                        <Image src={`https://api.dicebear.com/7.x/avataaars/svg?seed=Node${i}`} alt="Node" fill />
+                                        <Image src={`https://api.dicebear.com/9.x/avataaars/svg?seed=Node${i}`} alt="Node" fill />
                                     </div>
                                     <div>
                                         <h4 className="font-medium text-sm">Node {i}</h4>

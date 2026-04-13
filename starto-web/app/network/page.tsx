@@ -1,22 +1,36 @@
 "use client"
 
 import Sidebar from '@/components/feed/Sidebar'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useNetworkStore } from '@/store/useNetworkStore'
+import { useAuthStore } from '@/store/useAuthStore'
 import { useRatingStore } from '@/store/useRatingStore'
 import { Check, X, Users, UserCheck, MessageSquare, Zap, Link as LinkIcon, UserPlus, CheckCheck } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 export default function NetworkPage() {
-    const { connections, pendingRequests, offers, acceptRequest, rejectRequest, removeConnection, deleteOffer, sendRequest, isConnected, hasPendingRequest } = useNetworkStore()
+    const { user, token } = useAuthStore()
+    const { connections, pendingRequests, sentRequests, offers, acceptRequest, rejectRequest, fetchRequests, fetchOffers, deleteOffer, sendRequest } = useNetworkStore()
     const { getAverageRating } = useRatingStore()
     const [tab, setTab] = useState<'connections' | 'requests' | 'offers'>('connections')
     const [search, setSearch] = useState('')
 
-    const filteredConnections = connections.filter(c =>
-        c.username.toLowerCase().includes(search.toLowerCase())
+    useEffect(() => {
+        if (token) {
+            fetchRequests(token);
+            fetchOffers();
+        }
+    }, [token, fetchRequests, fetchOffers]);
+
+    const connectionsArray = Array.isArray(connections) ? connections : []
+    const pendingArray = Array.isArray(pendingRequests) ? pendingRequests : []
+    const sentArray = Array.isArray(sentRequests) ? sentRequests : []
+    const offersArray = Array.isArray(offers) ? offers : []
+
+    const filteredConnections = connectionsArray.filter(c =>
+        c?.username?.toLowerCase().includes(search.toLowerCase())
     )
 
     return (
@@ -33,16 +47,16 @@ export default function NetworkPage() {
                                 onClick={() => setTab('connections')}
                                 className={`pb-3 font-bold text-xs uppercase tracking-widest border-b-2 transition-all ${tab === 'connections' ? 'border-primary text-primary' : 'border-transparent text-text-muted hover:text-primary'}`}
                             >
-                                Connections ({connections.length})
+                                Connections ({connectionsArray.length})
                             </button>
                             <button
                                 onClick={() => setTab('requests')}
                                 className={`pb-3 font-bold text-xs uppercase tracking-widest border-b-2 transition-all flex items-center gap-1.5 ${tab === 'requests' ? 'border-primary text-primary' : 'border-transparent text-text-muted hover:text-primary'}`}
                             >
                                 Requests
-                                {pendingRequests.length > 0 && (
+                                {pendingArray.length > 0 && (
                                     <span className="bg-primary text-white text-[9px] font-bold rounded-full px-1.5 py-0.5">
-                                        {pendingRequests.length}
+                                        {pendingArray.length}
                                     </span>
                                 )}
                             </button>
@@ -51,9 +65,9 @@ export default function NetworkPage() {
                                 className={`pb-3 font-bold text-xs uppercase tracking-widest border-b-2 transition-all flex items-center gap-1.5 ${tab === 'offers' ? 'border-primary text-primary' : 'border-transparent text-text-muted hover:text-primary'}`}
                             >
                                 Offers
-                                {(offers || []).length > 0 && (
+                                {offersArray.length > 0 && (
                                     <span className="bg-yellow-500 text-white text-[9px] font-bold rounded-full px-1.5 py-0.5">
-                                        {(offers || []).length}
+                                        {offersArray.length}
                                     </span>
                                 )}
                             </button>
@@ -93,7 +107,7 @@ export default function NetworkPage() {
                                                     >
                                                         <Link href={`/profile/${c.username}`}>
                                                             <div className="w-12 h-12 rounded-full bg-surface-2 relative overflow-hidden border border-border flex-shrink-0">
-                                                                <Image src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${c.username}`} alt={c.username} fill className="object-cover" />
+                                                                <Image src={`https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(c.username)}`} alt={c.username} fill className="object-cover" />
                                                             </div>
                                                         </Link>
                                                         <div className="flex-1 min-w-0">
@@ -131,7 +145,7 @@ export default function NetworkPage() {
 
                         {/* ── REQUESTS TAB ── */}
                         {tab === 'requests' && (
-                            pendingRequests.length === 0 ? (
+                            pendingArray.length === 0 ? (
                                 <div className="flex flex-col items-center py-20 text-text-muted">
                                     <UserCheck className="w-10 h-10 mb-3 opacity-30" />
                                     <p className="text-sm font-medium">No pending requests</p>
@@ -151,7 +165,7 @@ export default function NetworkPage() {
                                             >
                                                 <Link href={`/profile/${r.username}`}>
                                                     <div className="w-12 h-12 rounded-full bg-surface-2 relative overflow-hidden border border-border flex-shrink-0">
-                                                        <Image src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${r.username}`} alt={r.username} fill className="object-cover" />
+                                                        <Image src={`https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(r.username)}`} alt={r.username} fill className="object-cover" />
                                                     </div>
                                                 </Link>
                                                 <div className="flex-1 min-w-0">
@@ -164,7 +178,7 @@ export default function NetworkPage() {
                                                 <div className="flex gap-2">
                                                     {/* Accept */}
                                                     <button
-                                                        onClick={() => acceptRequest(r.username)}
+                                                        onClick={() => token && acceptRequest(r.id!, token)}
                                                         title="Accept connection"
                                                         className="p-2.5 rounded-xl border border-green-300 bg-green-50 text-green-600 hover:bg-green-100 transition-all"
                                                     >
@@ -172,7 +186,7 @@ export default function NetworkPage() {
                                                     </button>
                                                     {/* Reject */}
                                                     <button
-                                                        onClick={() => rejectRequest(r.username)}
+                                                        onClick={() => token && rejectRequest(r.id!, token)}
                                                         title="Reject request"
                                                         className="p-2.5 rounded-xl border border-red-200 bg-red-50 text-red-400 hover:bg-red-100 transition-all"
                                                     >
@@ -188,7 +202,7 @@ export default function NetworkPage() {
 
                         {/* ── OFFERS TAB ── */}
                         {tab === 'offers' && (
-                            (!offers || offers.length === 0) ? (
+                            offersArray.length === 0 ? (
                                 <div className="flex flex-col items-center py-20 text-text-muted">
                                     <div className="w-12 h-12 bg-yellow-50 rounded-full flex items-center justify-center mb-3">
                                         <Zap className="w-6 h-6 text-yellow-500" />
@@ -200,7 +214,7 @@ export default function NetworkPage() {
                                 <div className="space-y-3">
                                     <p className="text-xs text-text-muted mb-4">People who have generously offered to help with your signals.</p>
                                     <AnimatePresence>
-                                        {offers.map(o => (
+                                        {offersArray.map(o => (
                                             <motion.div
                                                 key={o.id}
                                                 initial={{ opacity: 0, y: 8 }}
@@ -212,7 +226,7 @@ export default function NetworkPage() {
                                                     <div className="flex items-center gap-3">
                                                         <Link href={`/profile/${o.fromUsername}`}>
                                                             <div className="w-10 h-10 rounded-full bg-surface-2 relative overflow-hidden border border-border flex-shrink-0 group-hover:border-primary transition-colors">
-                                                                <Image src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${o.fromUsername}`} alt={o.fromUsername} fill className="object-cover" />
+                                                                <Image src={`https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(o.fromUsername)}`} alt={o.fromUsername} fill className="object-cover" />
                                                             </div>
                                                         </Link>
                                                         <div>
@@ -221,14 +235,17 @@ export default function NetworkPage() {
                                                                     {o.name} <span className="text-text-muted text-xs font-normal">(@{o.fromUsername})</span>
                                                                 </Link>
                                                                 {/* Connect icon */}
-                                                                {isConnected(o.fromUsername) ? (
+                                                                {connectionsArray.some(c => c.username === o.fromUsername) ? (
                                                                     <span title="Already connected" className="text-green-500"><CheckCheck className="w-4 h-4" /></span>
-                                                                ) : hasPendingRequest(o.fromUsername) ? (
+                                                                ) : sentArray.some(r => r.username === o.fromUsername && r.status === 'pending') ? (
                                                                     <span title="Request sent" className="text-yellow-500"><CheckCheck className="w-4 h-4" /></span>
                                                                 ) : (
                                                                     <button
                                                                         title="Send connection request"
-                                                                        onClick={() => sendRequest({ username: o.fromUsername, category: 'Network', timeAdded: Date.now() })}
+                                                                        onClick={() => {
+                                                                            // Requires a signalId, so we use the one from the offer
+                                                                            if (token) sendRequest(o.signalId, 'Connecting via offer!', token);
+                                                                        }}
                                                                         className="text-text-muted hover:text-primary transition-colors p-0.5 rounded"
                                                                     >
                                                                         <UserPlus className="w-4 h-4" />
@@ -267,11 +284,11 @@ export default function NetworkPage() {
                         <div className="space-y-4">
                             <div className="flex justify-between items-center">
                                 <span className="text-sm text-text-secondary">Connections</span>
-                                <span className="font-mono font-bold">{connections.length}</span>
+                                <span className="font-mono font-bold">{(connections || []).length}</span>
                             </div>
                             <div className="flex justify-between items-center">
                                 <span className="text-sm text-text-secondary">Pending Requests</span>
-                                <span className="font-mono font-bold text-yellow-600">{pendingRequests.length}</span>
+                                <span className="font-mono font-bold text-yellow-600">{(pendingRequests || []).length}</span>
                             </div>
                             <div className="flex justify-between items-center pt-4 border-t border-border">
                                 <span className="text-sm text-text-secondary">Help Offers Received</span>

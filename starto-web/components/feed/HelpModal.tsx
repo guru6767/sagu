@@ -19,27 +19,42 @@ export default function HelpModal({ isOpen, onClose, signalId, signalTitle }: He
     const addOffer = useNetworkStore(state => state.addOffer)
     const currentUser = useAuthStore(state => state.user?.username)
     
-    const [name, setName] = useState('')
-    const [projectLink, setProjectLink] = useState('')
+    const [organizationName, setOrganizationName] = useState('')
+    const [portfolioLink, setPortfolioLink] = useState('')
+    const [message, setMessage] = useState('')
     const [isSubmitted, setIsSubmitted] = useState(false)
+    const [error, setError] = useState('')
 
-    const handleSubmit = () => {
-        if (!name || !projectLink) return
-        incrementOffer(signalId)
-        addOffer({
-            signalId,
-            name,
-            projectLink,
-            fromUsername: currentUser || 'krish_startup'
-        })
-        
-        setIsSubmitted(true)
-        setTimeout(() => {
-            setIsSubmitted(false)
-            setName('')
-            setProjectLink('')
-            onClose()
-        }, 2000)
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault()
+        setError('')
+
+        // Simple URL Validation
+        const urlPattern = /^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([\/\w .-]*)*\/?$/
+        if (!portfolioLink.match(urlPattern)) {
+            setError('Please provide a valid URL (e.g., https://linkedin.com/in/...)')
+            return
+        }
+
+        try {
+            await addOffer({
+                signalId: signalId,
+                organizationName: organizationName,
+                portfolioLink: portfolioLink,
+                message: message || `I'm interested in helping with: ${signalTitle}`
+            });
+            incrementOffer(signalId)
+            setIsSubmitted(true)
+            setTimeout(() => {
+                setIsSubmitted(false)
+                setOrganizationName('')
+                setPortfolioLink('')
+                setMessage('')
+                onClose()
+            }, 2000)
+        } catch (err: any) {
+            setError(err.message || 'Failed to send offer. Please try again.')
+        }
     }
 
     return (
@@ -63,7 +78,7 @@ export default function HelpModal({ isOpen, onClose, signalId, signalTitle }: He
                             </button>
                         </div>
 
-                        <div className="p-6 space-y-6">
+                        <div className="p-6 space-y-5">
                             {isSubmitted ? (
                                 <motion.div 
                                     initial={{ opacity: 0, scale: 0.9 }}
@@ -79,37 +94,52 @@ export default function HelpModal({ isOpen, onClose, signalId, signalTitle }: He
                             ) : (
                                 <>
                                     <section>
-                                        <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted mb-2 block">Your Name / Organization</label>
+                                        <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted mb-2 block text-left">Your Name / Organization</label>
                                         <div className="relative">
                                             <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
                                             <input
                                                 type="text"
                                                 placeholder="John Doe / TechCorp"
                                                 className="w-full bg-surface-1 border border-border p-3 pl-10 rounded-xl outline-none focus:border-black text-sm transition-colors"
-                                                value={name}
-                                                onChange={(e) => setName(e.target.value)}
+                                                value={organizationName}
+                                                onChange={(e) => setOrganizationName(e.target.value)}
                                             />
                                         </div>
                                     </section>
 
                                     <section>
-                                        <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted mb-2 block">Most Recent Project Link</label>
+                                        <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted mb-2 block text-left">Most Recent Project Link</label>
                                         <div className="relative">
                                             <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
                                             <input
                                                 type="url"
                                                 placeholder="https://github.com/johndoe/project"
-                                                className="w-full bg-surface-1 border border-border p-3 pl-10 rounded-xl outline-none focus:border-black text-sm transition-colors"
-                                                value={projectLink}
-                                                onChange={(e) => setProjectLink(e.target.value)}
+                                                className={`w-full bg-surface-1 border ${error ? 'border-red-500' : 'border-border'} p-3 pl-10 rounded-xl outline-none focus:border-black text-sm transition-colors`}
+                                                value={portfolioLink}
+                                                onChange={(e) => {
+                                                    setPortfolioLink(e.target.value)
+                                                    if (error) setError('')
+                                                }}
                                             />
                                         </div>
-                                        <p className="text-[10px] text-text-muted mt-2">Provides context and credibility to your offer.</p>
+                                        {error && <p className="text-[10px] text-red-500 mt-1 text-left">{error}</p>}
+                                    </section>
+
+                                    <section>
+                                        <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted mb-2 block text-left">Quick Message</label>
+                                        <textarea
+                                            placeholder="Tell them how you can help..."
+                                            rows={2}
+                                            className="w-full bg-surface-1 border border-border p-3 rounded-xl outline-none focus:border-black text-sm transition-colors resize-none"
+                                            value={message}
+                                            onChange={(e) => setMessage(e.target.value)}
+                                        />
+                                        <p className="text-[10px] text-text-muted mt-2 text-left">Provides context and credibility to your offer.</p>
                                     </section>
 
                                     <button 
                                         onClick={handleSubmit}
-                                        disabled={!name || !projectLink}
+                                        disabled={!organizationName || !portfolioLink}
                                         className="w-full bg-black text-white px-8 py-3.5 rounded-xl font-bold text-xs tracking-wider flex items-center justify-center gap-2 hover:bg-black/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed uppercase mt-auto"
                                     >
                                         <Zap className="w-4 h-4 fill-white text-white" /> Send Offer

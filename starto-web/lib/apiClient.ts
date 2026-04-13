@@ -25,6 +25,7 @@ export interface ApiSignal {
     createdAt: string;    // ISO datetime
     expiresAt: string;
     userId: string;
+    userPlan?: string;
 }
 
 export interface ApiUser {
@@ -38,6 +39,10 @@ export interface ApiUser {
     city: string | null;
     state: string | null;
     industry: string | null;
+    websiteUrl: string | null;
+    linkedinUrl: string | null;
+    twitterUrl: string | null;
+    githubUrl: string | null;
     plan: string;
     isOnline: boolean;
     lastSeen: string;
@@ -178,6 +183,54 @@ export const commentsApi = {
             method: 'POST',
             body: JSON.stringify({ content }),
         }, token),
+};
+
+// ─── Connection API ──────────────────────────────────────────────────────────
+export const connectionsApi = {
+    /** POST /api/connections/request */
+    sendRequest: (signalId: string, message: string, token: string) =>
+        apiFetch<any>('/api/connections/request', {
+            method: 'POST',
+            body: JSON.stringify({ signalId, message }),
+        }, token),
+
+    /** GET /api/connections/pending — incoming for founder */
+    getPending: (token: string) =>
+        apiFetch<any[]>('/api/connections/pending', {}, token),
+
+    /** GET /api/connections/sent — outgoing for talent */
+    getSent: (token: string) =>
+        apiFetch<any[]>('/api/connections/sent', {}, token),
+
+    /** GET /api/connections/accepted */
+    getAccepted: (token: string) =>
+        apiFetch<any[]>('/api/connections/accepted', {}, token),
+
+    /** PUT /api/connections/:id/accept */
+    accept: (id: string, token: string) =>
+        apiFetch<any>(`/api/connections/${id}/accept`, { method: 'PUT' }, token),
+
+    /** PUT /api/connections/:id/reject */
+    reject: (id: string, token: string) =>
+        apiFetch<any>(`/api/connections/${id}/reject`, { method: 'PUT' }, token),
+};
+
+// ─── Offer API ───────────────────────────────────────────────────────────────
+export const offersApi = {
+    create: (payload: { signalId: string; organizationName: string; portfolioLink: string; message: string }, token: string) =>
+        apiFetch<any>('/api/offers/request', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        }, token),
+
+    getInbox: (token: string) =>
+        apiFetch<any[]>('/api/offers/inbox', {}, token),
+
+    getSent: (token: string) =>
+        apiFetch<any[]>('/api/offers/sent', {}, token),
+
+    getWhatsappLink: (id: string, token: string) =>
+        apiFetch<{ link: string }>(`/api/offers/${id}/whatsapp`, {}, token),
 };
 
 export default apiFetch;
