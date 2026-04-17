@@ -19,6 +19,7 @@ export interface Signal {
     strength: string;
     status: 'Active' | 'Solved';
     type?: 'need' | 'help';
+    userPlan?: string;
     stats: {
         responses: number;
         offers: number;
@@ -109,3 +110,25 @@ export const useSignalStore = create<SignalState>()(
         }
     )
 )
+
+export function getSignalExpiration(signal: any) {
+    const strengthStr = signal.strength || signal.signalStrength || '7';
+    const totalDuration = parseInt(strengthStr) || 7;
+    // Default to 1 day ago if no createdAt is provided for legacy
+    const safeCreatedAt = signal.createdAt ? new Date(signal.createdAt).getTime() : (Date.now() - (1000 * 60 * 60 * 24));
+    
+    // Calculate hours strictly using time difference
+    const msElapsed = Date.now() - safeCreatedAt;
+    const hoursElapsed = Math.floor(msElapsed / (1000 * 60 * 60));
+    const totalDurationHours = totalDuration * 24;
+    const hoursLeft = Math.max(0, totalDurationHours - hoursElapsed);
+    const daysLeft = Math.floor(hoursLeft / 24);
+    
+    return {
+        isExpired: hoursLeft <= 0,
+        daysLeft,
+        hoursLeft,
+        totalDuration,
+        progressPercent: Math.min(100, Math.max(0, 100 - (hoursElapsed / totalDurationHours) * 100))
+    };
+}

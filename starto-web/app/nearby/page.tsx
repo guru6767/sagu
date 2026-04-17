@@ -1,17 +1,18 @@
 "use client"
 
 import Sidebar from '@/components/feed/Sidebar'
+import MobileBottomNav from '@/components/feed/MobileBottomNav'
 import { Map as MapIcon, Filter, Layers, Navigation, Search } from 'lucide-react'
 import Image from 'next/image'
 
 export default function NearbyEcosystem() {
     return (
         <div className="min-h-screen bg-background flex justify-center">
-            <div className="max-w-[1400px] w-full flex">
+            <div className="max-w-[1400px] w-full flex flex-col md:flex-row pb-16 md:pb-0">
                 <Sidebar />
 
                 <main className="flex-1 flex flex-col min-h-screen">
-                    <header className="p-6 border-b border-border bg-white flex justify-between items-center">
+                    <header className="p-6 border-b border-border bg-white flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
                         <div>
                             <h1 className="text-2xl font-display">Nearby Ecosystem</h1>
                             <p className="text-xs text-text-secondary">Discover nodes within your 25km radius.</p>
@@ -57,7 +58,7 @@ export default function NearbyEcosystem() {
                             {[1, 2, 3, 4, 5, 6].map(i => (
                                 <div key={i} className="flex items-center gap-4 p-4 border border-border rounded-xl hover:border-text-muted cursor-pointer transition-all group">
                                     <div className="w-12 h-12 bg-surface-2 rounded-full border border-border group-hover:scale-110 transition-transform relative overflow-hidden">
-                                        <Image src={`https://api.dicebear.com/9.x/avataaars/svg?seed=Node${i}`} alt="Node" fill />
+                                        <Image src={`https://api.dicebear.com/9.x/avataaars/svg?seed=Node${i}`} alt="Node" fill unoptimized />
                                     </div>
                                     <div>
                                         <h4 className="font-medium text-sm">Node {i}</h4>
@@ -72,6 +73,7 @@ export default function NearbyEcosystem() {
                         </div>
                     </section>
                 </main>
+                <MobileBottomNav />
             </div>
         </div>
     )

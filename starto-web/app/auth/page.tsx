@@ -12,14 +12,14 @@ import { useLocalUserStore } from '@/store/useLocalUserStore'
 import { useSignalStore } from '@/store/useSignalStore'
 import { usersApi } from '@/lib/apiClient'
 
-type AuthMode = 'login' | 'signup' | 'onboarding'
+type AuthMode = 'login' | 'signup' | 'onboarding' | 'forgot_password'
 
 const ROLES = ['Founder', 'Talent', 'Mentor', 'Startup']
 
 export default function AuthPage() {
     const router = useRouter()
     const { setAuth } = useAuthStore()
-    const { registerUser, loginUser, getAllUsernames, updateUserRecord } = useLocalUserStore()
+    const { registerUser, loginUser, getAllUsernames, updateUserRecord, getUserByPhone, updatePasswordByPhone } = useLocalUserStore()
 
     const [mode, setMode] = useState<AuthMode>('login')
 
@@ -35,24 +35,75 @@ export default function AuthPage() {
 
     // Sign-up extra fields
     const [name, setName] = useState('')
+    const [gender, setGender] = useState('')
     const [role, setRole] = useState('')
     const [bio, setBio] = useState('')
     const [city, setCity] = useState('')
     const [phone, setPhone] = useState('')
 
+    const [forgotStep, setForgotStep] = useState<'phone' | 'otp' | 'reset'>('phone')
+    const [forgotOtp, setForgotOtp] = useState('')
+    const [forgotSuccess, setForgotSuccess] = useState(false)
+
     const switchMode = (m: AuthMode) => {
         setMode(m)
         setError('')
         setSignupSuccess(false)
+        setForgotSuccess(false)
         setEmail('')
         setPassword('')
         setName('')
+        setGender('')
         setBio('')
         setCity('')
         setPhone('')
         setConfirmPassword('')
         setShowPassword(false)
         setShowConfirmPassword(false)
+        setForgotStep('phone')
+        setForgotOtp('')
+    }
+
+    // ──────────── FORGOT PASSWORD ────────────
+    const handleForgotPhoneSubmit = (e: React.FormEvent) => {
+        e.preventDefault()
+        setError('')
+        if (!phone) {
+            setError('Please enter a mobile number.')
+            return
+        }
+        const user = getUserByPhone(phone)
+        if (!user) {
+            setError('This phone number is not registered.')
+            return
+        }
+        // User found, mock sending OTP
+        setForgotStep('otp')
+    }
+
+    const handleForgotOtpSubmit = (e: React.FormEvent) => {
+        e.preventDefault()
+        setError('')
+        if (forgotOtp !== '123456') {
+            setError('Invalid OTP. Please enter 123456.')
+            return
+        }
+        setForgotStep('reset')
+    }
+
+    const handleForgotResetSubmit = (e: React.FormEvent) => {
+        e.preventDefault()
+        setError('')
+        if (password.length < 8) {
+            setError('Password must be at least 8 characters.')
+            return
+        }
+        if (password !== confirmPassword) {
+            setError('Passwords do not match.')
+            return
+        }
+        updatePasswordByPhone(phone, password)
+        setForgotSuccess(true)
     }
 
     // ──────────── LOGIN ────────────
@@ -120,7 +171,7 @@ export default function AuthPage() {
                 city: u.city,
                 state: '',
                 bio: u.bio,
-                avatarUrl: `https://api.dicebear.com/9.x/avataaars/svg?seed=${u.avatarSeed}`,
+                avatarUrl: `https://api.dicebear.com/9.x/avataaars/svg?seed=${u.avatarSeed}${u.gender === 'Female' ? '&top=longHair' : '&top=shortHair&facialHairProbability=0'}`,
                 plan: 'Free',
                 signalCount: 0,
                 networkSize: 0,
@@ -156,7 +207,7 @@ export default function AuthPage() {
         setLoading(true)
         setError('')
         try {
-            if (!name.trim() || !email.trim() || !password || !role || !city.trim() || !phone) {
+            if (!name.trim() || !gender || !email.trim() || !password || !role || !city.trim() || !phone) {
                 setError('Please fill all required fields.')
                 return
             }
@@ -199,7 +250,7 @@ export default function AuthPage() {
 
             const avatarSeed = username + Date.now()
 
-            const result = registerUser({ email: email.trim(), password, name: name.trim(), role, bio, city, phone, username, avatarSeed })
+            const result = registerUser({ email: email.trim(), password, name: name.trim(), role, bio, city, phone, username, avatarSeed, gender } as any)
             if (!result.success) {
                 setError(result.error || 'Registration failed.')
                 return
@@ -274,9 +325,110 @@ export default function AuthPage() {
                                 </button>
                             </form>
                             <p className="text-center text-xs text-gray-500 mt-4">
+                                <button type="button" onClick={() => switchMode('forgot_password')} className="text-gray-400 hover:text-white underline mb-3 block w-full text-center hover:opacity-80">Forgot Password?</button>
                                 Don&apos;t have an account?{' '}
-                                <button onClick={() => switchMode('signup')} className="text-gray-300 hover:text-white underline">Sign up</button>
+                                <button type="button" onClick={() => switchMode('signup')} className="text-gray-300 hover:text-white underline">Sign up</button>
                             </p>
+                        </motion.div>
+                    )}
+
+                    {/* ──── FORGOT PASSWORD ──── */}
+                    {mode === 'forgot_password' && !forgotSuccess && (
+                        <motion.div key="forgot" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-4 text-left">
+                            <h2 className="text-xl font-bold text-white mb-2 text-center">Reset Password</h2>
+                            
+                            {forgotStep === 'phone' && (
+                                <form onSubmit={handleForgotPhoneSubmit} className="space-y-4">
+                                    <p className="text-sm text-gray-400 text-center mb-4">Enter your registered mobile number to receive an OTP.</p>
+                                    <div>
+                                        <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">Mobile Number</label>
+                                        <PhoneInput
+                                            international
+                                            defaultCountry="IN"
+                                            value={phone}
+                                            onChange={(val) => setPhone(val || '')}
+                                            className="phone-input-custom mt-2"
+                                        />
+                                    </div>
+                                    {error && <p className="text-red-500 text-xs flex items-center gap-1 font-medium"><AlertCircle className="w-3 h-3" /> {error}</p>}
+                                    <button type="submit" className="w-full bg-white text-black py-4 px-6 rounded-xl font-bold flex items-center justify-center gap-3 hover:bg-gray-200 transition-all mt-4">
+                                        Send OTP <ArrowRight className="w-4 h-4" />
+                                    </button>
+                                    <button type="button" onClick={() => switchMode('login')} className="w-full text-center text-xs text-gray-400 hover:text-white mt-4">Back to Login</button>
+                                </form>
+                            )}
+
+                            {forgotStep === 'otp' && (
+                                <form onSubmit={handleForgotOtpSubmit} className="space-y-4">
+                                    <p className="text-sm text-gray-400 text-center mb-4">Enter the 6-digit OTP sent to {phone}.<br/><span className="text-xs text-yellow-500">(Use 123456 for testing)</span></p>
+                                    <div>
+                                        <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">OTP Code</label>
+                                        <input type="text" value={forgotOtp} onChange={e => setForgotOtp(e.target.value)} required maxLength={6} className="w-full mt-2 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-white/40 focus:bg-white/10 transition-colors text-center tracking-widest text-lg" />
+                                    </div>
+                                    {error && <p className="text-red-500 text-xs flex items-center gap-1 font-medium"><AlertCircle className="w-3 h-3" /> {error}</p>}
+                                    <button type="submit" className="w-full bg-white text-black py-4 px-6 rounded-xl font-bold flex items-center justify-center gap-3 hover:bg-gray-200 transition-all mt-4">
+                                        Verify OTP <ArrowRight className="w-4 h-4" />
+                                    </button>
+                                    <button type="button" onClick={() => setForgotStep('phone')} className="w-full text-center text-xs text-gray-400 hover:text-white mt-4">Change mobile number</button>
+                                </form>
+                            )}
+
+                            {forgotStep === 'reset' && (
+                                <form onSubmit={handleForgotResetSubmit} className="space-y-4">
+                                    <p className="text-sm text-gray-400 text-center mb-4">Create a new password for your account.</p>
+                                    <div>
+                                        <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">New Password</label>
+                                        <div className="auth-input-container">
+                                            <input 
+                                                type={showPassword ? "text" : "password"} 
+                                                value={password} 
+                                                onChange={e => setPassword(e.target.value)} 
+                                                required 
+                                                className="w-full mt-2 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-white/40 focus:bg-white/10 transition-colors pr-12" 
+                                            />
+                                            <div className="auth-input-icon mt-1" onClick={() => setShowPassword(!showPassword)}>
+                                                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="mt-4">
+                                        <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">Confirm New Password</label>
+                                        <div className="auth-input-container">
+                                            <input 
+                                                type={showConfirmPassword ? "text" : "password"} 
+                                                value={confirmPassword} 
+                                                onChange={e => setConfirmPassword(e.target.value)} 
+                                                required 
+                                                className="w-full mt-2 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-white/40 focus:bg-white/10 transition-colors pr-12" 
+                                            />
+                                            <div className="auth-input-icon mt-1" onClick={() => setShowConfirmPassword(!showConfirmPassword)}>
+                                                {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {error && <p className="text-red-500 text-xs flex items-center gap-1 font-medium"><AlertCircle className="w-3 h-3" /> {error}</p>}
+                                    <button type="submit" className="w-full bg-white text-black py-4 px-6 rounded-xl font-bold flex items-center justify-center gap-3 hover:bg-gray-200 transition-all mt-4">
+                                        Reset Password <ArrowRight className="w-4 h-4" />
+                                    </button>
+                                </form>
+                            )}
+                        </motion.div>
+                    )}
+
+                    {/* ──── SUCCESS AFTER FORGOT PASSWORD ──── */}
+                    {mode === 'forgot_password' && forgotSuccess && (
+                        <motion.div key="forgot-success" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="text-center space-y-4 py-4">
+                            <div className="w-16 h-16 bg-green-500/10 rounded-full flex items-center justify-center mx-auto">
+                                <CheckCircle className="w-8 h-8 text-green-400" />
+                            </div>
+                            <h2 className="text-xl font-bold text-white">Password Reset Successfully!</h2>
+                            <p className="text-sm text-gray-400">Your password has been updated. Please login again with your new password.</p>
+                            <button
+                                onClick={() => switchMode('login')}
+                                className="w-full bg-white text-black py-4 px-6 rounded-xl font-bold flex items-center justify-center gap-3 hover:bg-gray-200 transition-all mt-4"
+                            >
+                                Go to Login <ArrowRight className="w-4 h-4" />
+                            </button>
                         </motion.div>
                     )}
 
@@ -286,6 +438,14 @@ export default function AuthPage() {
                             <div>
                                 <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">Full Name <span className="text-red-400">*</span></label>
                                 <input type="text" value={name} onChange={e => setName(e.target.value)} required className="w-full mt-2 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-white/40 focus:bg-white/10 transition-colors" />
+                            </div>
+                            <div>
+                                <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">Gender <span className="text-red-400">*</span></label>
+                                <select value={gender} onChange={e => setGender(e.target.value)} required className={`w-full mt-2 bg-[#111] border border-white/10 rounded-lg px-4 py-3 outline-none focus:border-white/40 transition-colors appearance-none ${gender === '' ? 'text-gray-500' : 'text-white'}`}>
+                                    <option value="" disabled hidden>Select Gender</option>
+                                    <option value="Male" className="text-white">Male</option>
+                                    <option value="Female" className="text-white">Female</option>
+                                </select>
                             </div>
                             <div>
                                 <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">Role <span className="text-red-400">*</span></label>

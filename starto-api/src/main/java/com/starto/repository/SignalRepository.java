@@ -12,6 +12,14 @@ public interface SignalRepository extends JpaRepository<Signal, UUID> {
 
     List<Signal> findByStatus(String status);
 
+    // Case-insensitive status lookup
+    @Query("SELECT s FROM Signal s WHERE LOWER(s.status) = LOWER(:status)")
+    List<Signal> findByStatusIgnoreCase(@Param("status") String status);
+
+    // All signals, no status filter (for debugging)
+    @Query("SELECT s FROM Signal s ORDER BY s.createdAt DESC")
+    List<Signal> findAllSignals();
+
     List<Signal> findByUserId(UUID userId);
 
     // city — partial, case-insensitive

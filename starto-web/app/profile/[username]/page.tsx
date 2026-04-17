@@ -10,6 +10,7 @@ import { useNetworkStore } from '@/store/useNetworkStore'
 import { useRatingStore } from '@/store/useRatingStore'
 import Link from 'next/link'
 import { usersApi } from '@/lib/apiClient'
+import { motion } from 'framer-motion'
 
 export default function PublicProfile({ params }: { params: { username: string } }) {
     const { username: paramUsername } = params
@@ -37,7 +38,9 @@ export default function PublicProfile({ params }: { params: { username: string }
     const { addRating, getAverageRating, getRatingsFor, hasRated } = useRatingStore()
 
     const [isMounted, setIsMounted] = useState(false)
-
+    const [showAllSignals, setShowAllSignals] = useState(false)
+    const [requestJustSent, setRequestJustSent] = useState(false)
+    
     useEffect(() => {
         setIsMounted(true)
         setIsLoadingUser(true)
@@ -117,16 +120,20 @@ export default function PublicProfile({ params }: { params: { username: string }
                     <div className="pt-8 px-8 flex items-end gap-6 border-b border-border pb-8 bg-surface-1">
                         <div className="w-32 h-32 bg-white rounded-3xl p-1.5 border-4 border-background shadow-2xl relative overflow-hidden shrink-0">
                             {displayAvatarUrl ? (
-                                <Image src={displayAvatarUrl} alt="Profile" fill className="object-cover rounded-2xl" />
+                                <Image src={displayAvatarUrl} alt="Profile" fill className="object-cover rounded-2xl" unoptimized />
                             ) : (
-                                <Image src={`https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(paramUsername)}`} alt={displayName} fill className="object-cover rounded-2xl" />
+                                <Image src={`https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(paramUsername)}`} alt={displayName} fill className="object-cover rounded-2xl" unoptimized />
                             )}
                         </div>
                         
                         <div className="flex-1 pb-2">
                             <div className="flex items-center gap-2 mb-1">
                                 <h1 className="text-3xl font-display text-black">{displayName}</h1>
-                                {(displayVerified || displaySubscription !== 'Free') && <BadgeCheck className="w-6 h-6 fill-primary text-white" />}
+                                {(displayVerified || displaySubscription === 'Pro' || displaySubscription === 'Founder') && (
+                                    <span title={`${displaySubscription} Verified`} className="relative inline-flex items-center justify-center">
+                                        <BadgeCheck className="w-7 h-7 fill-black text-white" />
+                                    </span>
+                                )}
                             </div>
                             <p className="text-text-secondary font-medium flex items-center gap-2">
                                 {displayRole} • {displayCity.split(',')[0]}
@@ -137,33 +144,50 @@ export default function PublicProfile({ params }: { params: { username: string }
                             </p>
                         </div>
 
-                        {!isOwnProfile && (
-                            <div className="pb-2">
-                                <button 
-                                    disabled={!isMounted || (Array.isArray(sentRequests) && sentRequests.some(r => r.username === paramUsername && r.status === 'pending')) || userSignals.length === 0}
-                                    onClick={async () => {
-                                        if (!token) {
-                                            alert('Please login to connect');
-                                            return;
-                                        }
-                                        if (userSignals.length === 0) {
-                                            alert('This user has no active signals to connect to.');
-                                            return;
-                                        }
-                                        try {
-                                            await sendRequest(userSignals[0].id, 'Hi, I saw your profile and wanted to connect!', token);
-                                            alert(`Connection request sent to @${paramUsername}!`);
-                                        } catch (err) {
-                                            alert('Failed to send request.');
-                                        }
-                                    }}
-                                    className="flex items-center gap-2 bg-black text-white px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-black/80 transition-all shadow-lg active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
-                                >
-                                    <Users className="w-4 h-4" />
-                                    {isMounted && Array.isArray(sentRequests) && sentRequests.some(r => r.username === paramUsername && r.status === 'pending') ? 'Request Sent' : 'Connect'}
-                                </button>
-                            </div>
-                        )}
+                        {!isOwnProfile && (() => {
+                            const isPending = isMounted && Array.isArray(sentRequests) && sentRequests.some(r => r.username === paramUsername && r.status === 'pending');
+                            return (
+                                <div className="pb-2">
+                                    <button 
+                                        disabled={!isMounted || isPending || userSignals.length === 0}
+                                        onClick={async () => {
+                                            if (!token) {
+                                                alert('Please login to connect');
+                                                return;
+                                            }
+                                            if (userSignals.length === 0) {
+                                                alert('This user has no active signals to connect to.');
+                                                return;
+                                            }
+                                            try {
+                                                await sendRequest(userSignals[0].id, 'Hi, I saw your profile and wanted to connect!', token || 'mock-token', paramUsername);
+                                                setRequestJustSent(true);
+                                                // Animation state handles rendering "Sending..." then relies on isPending returning true
+                                            } catch (err) {
+                                                alert('Failed to send request.');
+                                            }
+                                        }}
+                                        className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all shadow-lg active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed ${
+                                            requestJustSent || isPending ? 'bg-green-500 text-white' : 'bg-black text-white hover:bg-black/80'
+                                        }`}
+                                    >
+                                        {requestJustSent ? (
+                                            <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="flex items-center gap-2">
+                                                <BadgeCheck className="w-4 h-4" /> Sending...
+                                            </motion.div>
+                                        ) : isPending ? (
+                                            <>
+                                                <BadgeCheck className="w-4 h-4" /> Request Sent
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Users className="w-4 h-4" /> Connect
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            );
+                        })()}
                     </div>
 
                     {/* Profile Body */}
@@ -241,19 +265,29 @@ export default function PublicProfile({ params }: { params: { username: string }
                                     <p className="text-sm">No active signals yet</p>
                                 </div>
                             ) : (
-                                userSignals.map(signal => (
-                                    <div key={signal.id} className="p-6 bg-surface-2 rounded-2xl border border-border group hover:border-primary transition-all">
-                                        <div className="flex justify-between items-start mb-4">
-                                            <span className="text-[10px] px-2 py-0.5 bg-black text-white rounded-full uppercase font-bold tracking-widest">{signal.category}</span>
-                                            <span className="text-[10px] font-bold text-text-muted">{signal.timeAgo}</span>
+                                <>
+                                    {(showAllSignals ? userSignals : userSignals.slice(0, 3)).map(signal => (
+                                        <div key={signal.id} className="p-6 bg-surface-2 rounded-2xl border border-border group hover:border-primary transition-all">
+                                            <div className="flex justify-between items-start mb-4">
+                                                <span className="text-[10px] px-2 py-0.5 bg-black text-white rounded-full uppercase font-bold tracking-widest">{signal.category}</span>
+                                                <span className="text-[10px] font-bold text-text-muted">{signal.timeAgo}</span>
+                                            </div>
+                                            <h3 className="text-xl font-display mb-2 group-hover:text-primary transition-colors">{signal.title}</h3>
+                                            <p className="text-sm text-text-secondary line-clamp-2">{signal.description}</p>
+                                            <div className="mt-4 pt-4 border-t border-border flex justify-between items-center text-[10px] font-bold uppercase tracking-widest">
+                                                <span className="flex items-center gap-1.5"><Zap className="w-3.5 h-3.5 text-primary" /> {signal.stats.responses} Responses</span>
+                                            </div>
                                         </div>
-                                        <h3 className="text-xl font-display mb-2 group-hover:text-primary transition-colors">{signal.title}</h3>
-                                        <p className="text-sm text-text-secondary line-clamp-2">{signal.description}</p>
-                                        <div className="mt-4 pt-4 border-t border-border flex justify-between items-center text-[10px] font-bold uppercase tracking-widest">
-                                            <span className="flex items-center gap-1.5"><Zap className="w-3.5 h-3.5 text-primary" /> {signal.stats.responses} Responses</span>
-                                        </div>
-                                    </div>
-                                ))
+                                    ))}
+                                    {userSignals.length > 3 && (
+                                        <button
+                                            onClick={() => setShowAllSignals(!showAllSignals)}
+                                            className="w-full py-3 rounded-xl border border-border text-sm font-bold hover:bg-surface-2 transition-all mt-2 text-black"
+                                        >
+                                            {showAllSignals ? 'View Less' : `View All ${userSignals.length} Signals`}
+                                        </button>
+                                    )}
+                                </>
                             )}
                         </div>
                     </div>

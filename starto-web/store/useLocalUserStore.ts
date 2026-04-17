@@ -12,6 +12,7 @@ interface LocalUserRecord {
     phone: string
     username: string
     avatarSeed: string
+    gender?: string
     createdAt: number
 }
 
@@ -20,8 +21,10 @@ interface LocalUserStore {
     registerUser: (data: Omit<LocalUserRecord, 'createdAt' | 'passwordHash'> & { password: string }) => { success: boolean; error?: string }
     loginUser: (email: string, password: string) => { success: boolean; user?: LocalUserRecord; error?: string }
     getUserByEmail: (email: string) => LocalUserRecord | undefined
+    getUserByPhone: (phone: string) => LocalUserRecord | undefined
     getAllUsernames: () => string[]
     updateUserRecord: (email: string, updates: Partial<Pick<LocalUserRecord, 'username'>>) => void
+    updatePasswordByPhone: (phone: string, newPassword: string) => void
     deleteUser: (email: string) => void
 }
 
@@ -68,6 +71,7 @@ export const useLocalUserStore = create<LocalUserStore>()(
                     phone,
                     username,
                     avatarSeed,
+                    gender: (arguments[0] as any).gender || 'Male',
                     createdAt: Date.now(),
                 }
                 set(state => ({ users: [...state.users, newUser] }))
@@ -89,11 +93,21 @@ export const useLocalUserStore = create<LocalUserStore>()(
                 return get().users.find(u => u.email.toLowerCase() === email.toLowerCase())
             },
 
+            getUserByPhone: (phone) => {
+                return get().users.find(u => u.phone === phone)
+            },
+
             getAllUsernames: () => get().users.map(u => u.username),
 
             updateUserRecord: (email, updates) => set(state => ({
                 users: state.users.map(u =>
                     u.email.toLowerCase() === email.toLowerCase() ? { ...u, ...updates } : u
+                )
+            })),
+
+            updatePasswordByPhone: (phone, newPassword) => set(state => ({
+                users: state.users.map(u =>
+                    u.phone === phone ? { ...u, passwordHash: hashPassword(newPassword) } : u
                 )
             })),
 

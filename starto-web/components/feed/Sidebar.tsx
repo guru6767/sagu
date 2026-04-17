@@ -9,6 +9,7 @@ import { useAuthStore } from '@/store/useAuthStore'
 import { useSignalStore } from '@/store/useSignalStore'
 import { useNetworkStore } from '@/store/useNetworkStore'
 import { signalsApi } from '@/lib/apiClient'
+import VerifiedAvatar from './VerifiedAvatar'
 
 const navItems = [
     { icon: Home, label: 'Home Feed', href: '/feed' },
@@ -23,7 +24,7 @@ export default function Sidebar() {
     const pathname = usePathname()
     const { isAuthenticated, user } = useAuthStore()
     const { signals } = useSignalStore()
-    const { connections } = useNetworkStore()
+    const { connections, pendingRequests, offers } = useNetworkStore()
     const [imageError, setImageError] = useState(false)
     const [backendStatus, setBackendStatus] = useState<'checking' | 'live' | 'offline'>('checking')
 
@@ -36,24 +37,20 @@ export default function Sidebar() {
 
     const mySignalCount = user ? signals.filter(s => s.username === user.username).length : 0
     const myNetworkCount = user ? connections.length : 0
+    const hasNetworkNotifications = user && ((pendingRequests?.length || 0) > 0 || (offers?.length || 0) > 0);
 
     return (
-        <aside className="w-[240px] sticky top-0 h-screen flex flex-col border-r border-border bg-background p-4 pt-8 shrink-0">
+        <aside className="hidden md:flex w-[240px] sticky top-0 h-screen flex-col border-r border-border bg-background p-4 pt-8 shrink-0">
             {isAuthenticated && user ? (
                 <Link href="/profile" className="flex items-center gap-3 mb-10 px-2 group hover:bg-surface-2 p-2 rounded-xl transition-all">
-                    <div className="w-10 h-10 bg-surface-2 rounded-full overflow-hidden border border-border relative flex items-center justify-center">
-                        {user.avatarUrl && !imageError ? (
-                            <Image
-                                src={user.avatarUrl}
-                                alt="Profile"
-                                fill
-                                className="object-cover"
-                                onError={() => setImageError(true)}
-                            />
-                        ) : (
-                            <Users className="w-6 h-6 text-text-muted" />
-                        )}
-                    </div>
+                    <VerifiedAvatar
+                        username={user.username || ''}
+                        avatarUrl={user.avatarUrl}
+                        plan={user.subscription || user.plan}
+                        size="w-10 h-10"
+                        badgeSize="w-3.5 h-3.5"
+                        fallback={<Users className="w-6 h-6 text-text-muted" />}
+                    />
                     <div className="overflow-hidden">
                         <div className="flex items-center gap-1.5">
                             <h3 className="font-medium text-sm truncate group-hover:text-primary transition-colors">{user.name}</h3>
@@ -84,13 +81,18 @@ export default function Sidebar() {
                         <Link
                             key={item.label}
                             href={item.href}
-                            className={`flex items-center gap-3 px-3 py-2.5 rounded-md transition-all ${isActive
+                            className={`flex justify-between items-center px-3 py-2.5 rounded-md transition-all ${isActive
                                 ? 'bg-primary text-white shadow-lg shadow-black/10'
                                 : 'text-text-secondary hover:bg-surface-2 hover:text-primary'
                                 }`}
                         >
-                            <Icon className="w-4 h-4" />
-                            <span className="text-sm font-medium">{item.label}</span>
+                            <div className="flex items-center gap-3">
+                                <Icon className="w-4 h-4" />
+                                <span className="text-sm font-medium">{item.label}</span>
+                            </div>
+                            {item.label === 'My Network' && hasNetworkNotifications && (
+                                <div className={`w-2 h-2 rounded-full ${isActive ? 'bg-white' : 'bg-black'}`} title="New requests or offers" />
+                            )}
                         </Link>
                     )
                 })}

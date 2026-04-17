@@ -87,6 +87,7 @@ async function apiFetch<T>(
 
     try {
         const res = await fetch(`${BASE_URL}${path}`, {
+            cache: 'no-store',
             ...options,
             headers,
         });

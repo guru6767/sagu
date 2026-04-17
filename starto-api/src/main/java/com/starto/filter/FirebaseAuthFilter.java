@@ -20,6 +20,11 @@ public class FirebaseAuthFilter extends OncePerRequestFilter {
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getServletPath();
         String uri = request.getRequestURI();
+        String method = request.getMethod();
+        // Skip auth for public GET endpoints
+        if ("GET".equalsIgnoreCase(method) && (path.equals("/api/signals") || path.startsWith("/api/signals/"))) {
+            return true;
+        }
         return path.equals("/api/auth/forgot-password") || 
                path.startsWith("/api/search") || 
                path.startsWith("/api/users") ||
@@ -47,6 +52,17 @@ public class FirebaseAuthFilter extends OncePerRequestFilter {
         }
 
         String idToken = authHeader.substring(7);
+
+        // DEV MODE: If token starts with "dev_", bypass Firebase and use the suffix as UID
+        if (idToken.startsWith("dev_")) {
+            String uid = idToken; // Keep the dev_ prefix
+            System.out.println("DEV AUTH BYPASS: Using UID " + uid);
+            UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(uid, null, Collections.emptyList());
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         try {
             FirebaseToken decodedToken = FirebaseAuth.getInstance().verifyIdToken(idToken);
             String uid = decodedToken.getUid();

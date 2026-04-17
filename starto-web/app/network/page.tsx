@@ -1,16 +1,20 @@
 "use client"
 
 import Sidebar from '@/components/feed/Sidebar'
+import MobileBottomNav from '@/components/feed/MobileBottomNav'
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useNetworkStore } from '@/store/useNetworkStore'
 import { useAuthStore } from '@/store/useAuthStore'
 import { useRatingStore } from '@/store/useRatingStore'
 import { Check, X, Users, UserCheck, MessageSquare, Zap, Link as LinkIcon, UserPlus, CheckCheck } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import VerifiedAvatar from '@/components/feed/VerifiedAvatar'
 
 export default function NetworkPage() {
+    const router = useRouter()
     const { user, token } = useAuthStore()
     const { connections, pendingRequests, sentRequests, offers, acceptRequest, rejectRequest, fetchRequests, fetchOffers, deleteOffer, sendRequest } = useNetworkStore()
     const { getAverageRating } = useRatingStore()
@@ -35,14 +39,14 @@ export default function NetworkPage() {
 
     return (
         <div className="min-h-screen bg-background flex justify-center">
-            <div className="max-w-[1400px] w-full flex">
+            <div className="max-w-[1400px] w-full flex flex-col md:flex-row pb-16 md:pb-0">
                 <Sidebar />
 
-                <main className="flex-1 max-w-[680px] border-r border-border min-h-screen">
+                <main className="flex-1 w-full max-w-[680px] md:border-r border-border min-h-screen">
                     {/* Header */}
                     <div className="sticky top-0 bg-white/80 backdrop-blur-md border-b border-border z-10 px-6 py-4">
                         <h1 className="font-display text-2xl mb-3">My Network</h1>
-                        <div className="flex gap-6 border-b border-border -mx-6 px-6">
+                        <div className="flex gap-4 sm:gap-6 border-b border-border -mx-6 px-6 overflow-x-auto whitespace-nowrap scrollbar-hide">
                             <button
                                 onClick={() => setTab('connections')}
                                 className={`pb-3 font-bold text-xs uppercase tracking-widest border-b-2 transition-all ${tab === 'connections' ? 'border-primary text-primary' : 'border-transparent text-text-muted hover:text-primary'}`}
@@ -106,9 +110,12 @@ export default function NetworkPage() {
                                                         className="flex items-center gap-4 p-4 bg-white border border-border rounded-2xl hover:border-primary transition-all"
                                                     >
                                                         <Link href={`/profile/${c.username}`}>
-                                                            <div className="w-12 h-12 rounded-full bg-surface-2 relative overflow-hidden border border-border flex-shrink-0">
-                                                                <Image src={`https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(c.username)}`} alt={c.username} fill className="object-cover" />
-                                                            </div>
+                                                            <VerifiedAvatar
+                                                                username={c.username}
+                                                                plan={c.plan}
+                                                                size="w-12 h-12"
+                                                                badgeSize="w-4 h-4"
+                                                            />
                                                         </Link>
                                                         <div className="flex-1 min-w-0">
                                                             <Link href={`/profile/${c.username}`} className="font-medium text-sm hover:text-primary transition-colors">
@@ -164,9 +171,12 @@ export default function NetworkPage() {
                                                 className="flex items-center gap-4 p-4 bg-white border border-border rounded-2xl"
                                             >
                                                 <Link href={`/profile/${r.username}`}>
-                                                    <div className="w-12 h-12 rounded-full bg-surface-2 relative overflow-hidden border border-border flex-shrink-0">
-                                                        <Image src={`https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(r.username)}`} alt={r.username} fill className="object-cover" />
-                                                    </div>
+                                                    <VerifiedAvatar
+                                                        username={r.username}
+                                                        plan={r.plan}
+                                                        size="w-12 h-12"
+                                                        badgeSize="w-4 h-4"
+                                                    />
                                                 </Link>
                                                 <div className="flex-1 min-w-0">
                                                     <Link href={`/profile/${r.username}`} className="font-medium text-sm hover:text-primary">
@@ -178,17 +188,17 @@ export default function NetworkPage() {
                                                 <div className="flex gap-2">
                                                     {/* Accept */}
                                                     <button
-                                                        onClick={() => token && acceptRequest(r.id!, token)}
+                                                        onClick={() => acceptRequest(r.id || r.username, token || 'mock-token')}
                                                         title="Accept connection"
-                                                        className="p-2.5 rounded-xl border border-green-300 bg-green-50 text-green-600 hover:bg-green-100 transition-all"
+                                                        className="p-2.5 rounded-xl border border-green-300 bg-green-50 text-green-600 hover:bg-green-100 transition-all active:scale-95"
                                                     >
                                                         <Check className="w-4 h-4" />
                                                     </button>
                                                     {/* Reject */}
                                                     <button
-                                                        onClick={() => token && rejectRequest(r.id!, token)}
+                                                        onClick={() => rejectRequest(r.id || r.username, token || 'mock-token')}
                                                         title="Reject request"
-                                                        className="p-2.5 rounded-xl border border-red-200 bg-red-50 text-red-400 hover:bg-red-100 transition-all"
+                                                        className="p-2.5 rounded-xl border border-red-200 bg-red-50 text-red-400 hover:bg-red-100 transition-all active:scale-95"
                                                     >
                                                         <X className="w-4 h-4" />
                                                     </button>
@@ -225,9 +235,12 @@ export default function NetworkPage() {
                                                 <div className="flex justify-between items-start">
                                                     <div className="flex items-center gap-3">
                                                         <Link href={`/profile/${o.fromUsername}`}>
-                                                            <div className="w-10 h-10 rounded-full bg-surface-2 relative overflow-hidden border border-border flex-shrink-0 group-hover:border-primary transition-colors">
-                                                                <Image src={`https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(o.fromUsername)}`} alt={o.fromUsername} fill className="object-cover" />
-                                                            </div>
+                                                            <VerifiedAvatar
+                                                                username={o.fromUsername}
+                                                                plan={o.plan}
+                                                                size="w-10 h-10"
+                                                                badgeSize="w-3.5 h-3.5"
+                                                            />
                                                         </Link>
                                                         <div>
                                                             <div className="flex items-center gap-2">
@@ -296,7 +309,21 @@ export default function NetworkPage() {
                             </div>
                         </div>
                     </div>
+
+                    {/* Sponsored Card */}
+                    <div className="bg-white border border-border p-6 rounded-2xl shadow-sm">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-text-muted mb-3">Sponsored</p>
+                        <h3 className="font-display text-lg mb-2 leading-snug">Want to run ads here?</h3>
+                        <p className="text-sm text-text-secondary leading-relaxed mb-5">Reach 1000s of founders, investors &amp; mentors in our ecosystem.</p>
+                        <button
+                            onClick={() => router.push('/subscription')}
+                            className="w-full bg-black text-white py-3 rounded-xl font-bold uppercase tracking-widest text-[10px] hover:bg-primary transition-colors"
+                        >
+                            Get started →
+                        </button>
+                    </div>
                 </aside>
+                <MobileBottomNav />
             </div>
         </div>
     )

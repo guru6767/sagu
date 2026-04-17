@@ -6,6 +6,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.hibernate.annotations.Formula;
 
 import java.math.BigDecimal;
@@ -24,7 +25,7 @@ public class Signal {
     private UUID id;
 
     @JsonIgnore
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
@@ -107,6 +108,17 @@ public class Signal {
 
     @Column(length = 50)
     private String seeking;
+
+    // Derived fields — sent to frontend but not stored
+    @JsonProperty("username")
+    public String getUsername() {
+        return user != null ? user.getUsername() : null;
+    }
+
+    @JsonProperty("userPlan")
+    public String getUserPlan() {
+        return user != null ? user.getPlan() : null;
+    }
 
     // public UUID getId() {
     // return id;

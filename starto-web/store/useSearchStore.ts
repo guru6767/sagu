@@ -75,9 +75,21 @@ export const useSearchStore = create<SearchState>((set) => ({
         const token = useAuthStore.getState().token;
         const { data, error } = await apiFetch<SearchResponse>(`/api/search?q=${encodeURIComponent(trimmedQuery)}`, {}, token);
         
+        // Helper to keep only one signal per user (latest is first)
+        const deduplicateByUser = (sigs: SearchResultSignal[]) => {
+            const seen = new Set<string>();
+            return sigs.filter(s => {
+                if (!seen.has(s.username)) {
+                    seen.add(s.username);
+                    return true;
+                }
+                return false;
+            });
+        };
+
         if (error) {
             // Even if backend fails, show local results if any
-            set({ error: `${error} (Showing local results)`, isLoading: false, signals: matchedLocalSignals, profiles: [] });
+            set({ error: `${error} (Showing local results)`, isLoading: false, signals: deduplicateByUser(matchedLocalSignals), profiles: [] });
         } else if (data) {
             // Merge backend results + local results, avoiding duplicates by ID
             const backendSignals = data.signals || [];
@@ -87,9 +99,9 @@ export const useSearchStore = create<SearchState>((set) => ({
                 ...matchedLocalSignals.filter(ls => !resultIds.has(ls.id))
             ];
 
-            set({ profiles: data.profiles || [], signals: mergedSignals, isLoading: false, error: null });
+            set({ profiles: data.profiles || [], signals: deduplicateByUser(mergedSignals), isLoading: false, error: null });
         } else {
-            set({ profiles: [], signals: matchedLocalSignals, isLoading: false });
+            set({ profiles: [], signals: deduplicateByUser(matchedLocalSignals), isLoading: false });
         }
     },
     clearSearch: () => set({ query: '', profiles: [], signals: [], error: null, isLoading: false })

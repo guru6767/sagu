@@ -1,6 +1,7 @@
 "use client"
 
 import Sidebar from '@/components/feed/Sidebar'
+import MobileBottomNav from '@/components/feed/MobileBottomNav'
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { MapPin, Search, BarChart4, TrendingUp, AlertTriangle, Briefcase, FileText, CheckCircle2 } from 'lucide-react'
@@ -19,10 +20,10 @@ export default function StartoAIExplore() {
 
     return (
         <div className="min-h-screen bg-background flex justify-center">
-            <div className="max-w-[1400px] w-full flex">
+            <div className="max-w-[1400px] w-full flex flex-col md:flex-row pb-16 md:pb-0">
                 <Sidebar />
 
-                <main className="flex-1 p-6 lg:p-12 overflow-y-auto">
+                <main className="flex-1 w-full p-4 md:p-6 lg:p-12 overflow-y-auto">
                     <header className="mb-12">
                         <div className="inline-flex items-center gap-2 bg-primary text-white px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest mb-4">
                             Powered by GPT-4o + Gemini
@@ -185,6 +186,7 @@ export default function StartoAIExplore() {
                         </div>
                     )}
                 </main>
+                <MobileBottomNav />
             </div>
         </div>
     )

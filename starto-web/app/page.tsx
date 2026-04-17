@@ -8,11 +8,11 @@ export default function LandingPage() {
     return (
         <div className="min-h-screen bg-[#0A0A0A] text-white selection:bg-white selection:text-black">
             {/* Navigation */}
-            <nav className="fixed top-0 w-full z-50 px-6 py-8 flex justify-between items-center bg-[#0A0A0A]/80 backdrop-blur-md">
-                <div className="text-xl font-bold tracking-tighter">STARTO V2</div>
-                <div className="flex gap-8 text-sm font-medium items-center">
-                    <Link href="/feed" className="hover:text-gray-400 transition-colors">LOGIN</Link>
-                    <Link href="/feed" className="bg-white text-black px-6 py-2 rounded-full font-bold hover:bg-gray-200 transition-all transform hover:scale-105">
+            <nav className="fixed top-0 w-full z-50 px-4 md:px-6 py-4 md:py-8 flex justify-between items-center bg-[#0A0A0A]/80 backdrop-blur-md">
+                <div className="text-lg md:text-xl font-bold tracking-tighter">STARTO V2</div>
+                <div className="flex gap-4 md:gap-8 text-xs md:text-sm font-medium items-center">
+                    <Link href="/feed" className="hidden sm:block hover:text-gray-400 transition-colors">LOGIN</Link>
+                    <Link href="/feed" className="bg-white text-black px-4 md:px-6 py-2 rounded-full font-bold hover:bg-gray-200 transition-all transform hover:scale-105">
                         GET STARTED
                     </Link>
                 </div>
@@ -30,7 +30,7 @@ export default function LandingPage() {
                         <div className="inline-block px-4 py-1 rounded-full border border-white/10 text-xs font-mono mb-8 bg-white/5">
                             PHASE 4: LIVE IN TIER-2 & TIER-3 CITIES
                         </div>
-                        <h1 className="text-6xl md:text-8xl font-bold tracking-tighter mb-8 leading-[0.9]">
+                        <h1 className="text-5xl sm:text-6xl md:text-8xl font-bold tracking-tighter mb-8 leading-[0.9]">
                             REAL-TIME ECOSYSTEM<br />
                             <span className="text-transparent bg-clip-text bg-gradient-to-b from-white to-white/40">INTELLIGENCE</span>
                         </h1>
@@ -75,7 +75,7 @@ export default function LandingPage() {
             {/* Footer */}
             <footer className="border-t border-white/5 py-20 px-6">
                 <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
-                    <div className="text-gray-500 text-sm font-mono">&copy; 2026 STARTO V2. ALL RIGHTS RESERVED.</div>
+                    <div className="text-gray-500 text-xs md:text-sm font-mono text-center md:text-left mb-4 md:mb-0">&copy; 2026 STARTO V2. ALL RIGHTS RESERVED.</div>
                     <div className="flex gap-8 text-xs font-mono text-gray-500">
                         <Link href="#">TERMS</Link>
                         <Link href="#">PRIVACY</Link>

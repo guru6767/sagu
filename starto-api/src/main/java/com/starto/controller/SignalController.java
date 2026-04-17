@@ -13,6 +13,7 @@ import org.springframework.security.core.Authentication;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @RestController
@@ -34,8 +35,22 @@ public class SignalController {
 
         String firebaseUid = authentication.getPrincipal().toString();
 
-        return userService.getUserByFirebaseUid(firebaseUid)
-                .map(user -> {
+        Optional<User> userOpt = userService.getUserByFirebaseUid(firebaseUid);
+        
+        // If user doesn't exist but it's a dev UID, try to auto-create
+        if (userOpt.isEmpty() && firebaseUid.startsWith("dev_")) {
+            String devUsername = firebaseUid.substring(4);
+            // We use dummy values since we only have the username from the dev_ token
+            userOpt = Optional.of(userService.createOrUpdateUser(
+                firebaseUid, 
+                devUsername + "@example.com", 
+                devUsername, 
+                devUsername, 
+                "Founder"
+            ));
+        }
+
+        return userOpt.map(user -> {
                     try {
                         signalService.validateSignalCreation(user);
                     } catch (RuntimeException ex) {

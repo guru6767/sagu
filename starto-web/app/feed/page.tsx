@@ -3,10 +3,11 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Sidebar from '@/components/feed/Sidebar'
+import MobileBottomNav from '@/components/feed/MobileBottomNav'
 import SignalCard from '@/components/feed/SignalCard'
 import { Plus, Search, Loader2, WifiOff, RefreshCw, X } from 'lucide-react'
 import RaiseSignalModal from '@/components/feed/RaiseSignalModal'
-import { useSignalStore, Signal } from '@/store/useSignalStore'
+import { useSignalStore, Signal, getSignalExpiration } from '@/store/useSignalStore'
 import { useAuthStore } from '@/store/useAuthStore'
 import { useNetworkStore } from '@/store/useNetworkStore'
 import { useSearchStore } from '@/store/useSearchStore'
@@ -48,12 +49,14 @@ function mapApiSignalToCard(s: ApiSignal) {
             views: s.viewCount ?? 0,
         },
         userPlan: s.userPlan || 'free',
+        createdAt: s.createdAt,
+        signalStrength: s.signalStrength
     }
 }
 
 export default function HomeFeed() {
     const router = useRouter()
-    const { isAuthenticated } = useAuthStore()
+    const { isAuthenticated, user } = useAuthStore()
     const { signals: localSignals } = useSignalStore()
     const { connections, sentRequests, pendingRequests, sendRequest } = useNetworkStore()
     const { query, setQuery, performSearch, clearSearch } = useSearchStore()
@@ -116,18 +119,25 @@ export default function HomeFeed() {
             description: s.description,
             strength: s.strength,
             stats: s.stats,
-            userPlan: 'free',
+            // Use the plan stored on the signal; if it's the current user's signal, use their live plan
+            userPlan: s.username === user?.username
+                ? (user?.subscription || user?.plan || s.userPlan || 'Free')
+                : (s.userPlan || 'Free'),
+            createdAt: s.createdAt
         })),
-    ]
+    ].filter(s => {
+        const { isExpired } = getSignalExpiration(s);
+        return !isExpired;
+    })
 
     return (
         <div className="min-h-screen bg-background flex justify-center">
-            <div className="max-w-[1400px] w-full flex">
+            <div className="max-w-[1400px] w-full flex flex-col md:flex-row mb-16 md:mb-0">
                 <Sidebar />
 
                 {/* Signals Feed */}
-                <main className="flex-1 max-w-2xl px-4 py-8 overflow-y-auto border-r border-border min-h-screen">
-                    <header className="mb-8 flex justify-between items-center bg-background/90 backdrop-blur-md sticky top-0 z-20 py-4 -mx-4 px-4 border-b border-border shadow-sm">
+                <main className="flex-1 max-w-2xl w-full px-4 py-8 md:overflow-y-auto border-r border-border">
+                    <header className="mb-8 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-background/90 backdrop-blur-md sticky top-0 z-20 py-4 -mx-4 px-4 border-b border-border shadow-sm">
                         <div className="flex items-center gap-4">
                             <h1 className="text-2xl font-bold font-display tracking-tight text-black">Signals Feed</h1>
                             
@@ -139,7 +149,7 @@ export default function HomeFeed() {
                             )}
                         </div>
                         
-                        <div className="flex gap-2 items-center flex-1 justify-end max-w-md ml-4">
+                        <div className="flex gap-2 items-center w-full sm:flex-1 justify-end sm:max-w-md sm:ml-4">
                             <div className="relative group flex-1">
                                 <div className="relative">
                                     <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors ${query ? 'text-primary' : 'text-text-muted'}`} />
@@ -211,10 +221,11 @@ export default function HomeFeed() {
                                         timeAgo={signal.timeAgo}
                                         category={signal.category}
                                         description={signal.description}
-                                        strength={signal.strength}
+                                        strength={signal.strength || (signal as any).signalStrength}
                                         stats={signal.stats}
                                         hideViews={true}
                                         userPlan={signal.userPlan}
+                                        createdAt={signal.createdAt}
                                     />
                                 </div>
                             ))}
@@ -227,7 +238,7 @@ export default function HomeFeed() {
                         <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                         <h3 className="font-display text-lg mb-2 relative z-10">Need Market Analysis?</h3>
                         <p className="text-text-secondary text-sm mb-6 relative z-10">Real World Data. No Hallucinations. Powered by Starto AI.</p>
-                        <button onClick={() => requireAuth(() => console.log('Launch Explore clicked'))} className="w-full bg-primary text-white py-3 rounded-md font-medium text-sm flex items-center justify-center gap-2 hover:opacity-90 relative z-10">
+                        <button onClick={() => requireAuth(() => router.push('/explore'))} className="w-full bg-primary text-white py-3 rounded-md font-medium text-sm flex items-center justify-center gap-2 hover:opacity-90 relative z-10">
                             Launch Explore →
                         </button>
                     </div>
@@ -257,6 +268,7 @@ export default function HomeFeed() {
                         setRefreshKey(k => k + 1)
                     }} 
                 />
+                <MobileBottomNav />
             </div>
         </div>
     )

@@ -119,7 +119,7 @@ export default function MySignals() {
                     </div>
                 </main>
 
-                <aside className="hidden lg:block w-[320px] p-8">
+                <aside className="hidden lg:block w-[320px] p-8 space-y-6">
                     <div className="bg-primary text-white p-6 rounded-xl relative overflow-hidden">
                         <div className="relative z-10">
                             <h3 className="font-display text-lg mb-2">Signal Insights</h3>
@@ -135,6 +135,19 @@ export default function MySignals() {
                             </div>
                         </div>
                         <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-white/5 rounded-full blur-2xl" />
+                    </div>
+
+                    {/* Sponsored Card */}
+                    <div className="bg-white border border-border p-6 rounded-xl shadow-sm">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-text-muted mb-3">Sponsored</p>
+                        <h3 className="font-display text-lg mb-2 leading-snug">Want to run ads here?</h3>
+                        <p className="text-sm text-text-secondary leading-relaxed mb-5">Reach 1000s of founders, investors &amp; mentors in our ecosystem.</p>
+                        <button
+                            onClick={() => router.push('/subscription')}
+                            className="w-full bg-black text-white py-3 rounded-xl font-bold uppercase tracking-widest text-[10px] hover:bg-primary transition-colors"
+                        >
+                            Get started →
+                        </button>
                     </div>
                 </aside>
             </div>

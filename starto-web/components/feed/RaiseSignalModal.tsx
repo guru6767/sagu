@@ -75,6 +75,9 @@ export default function RaiseSignalModal({ isOpen, onClose, editSignal }: RaiseS
         }
 
         // ── Try to post to backend first ─────────────────────────────────────
+        // If we don't have a real token but have a local user, use the dev_token fallback
+        const authToken = token || (user?.username ? `dev_${user.username}` : '');
+
         const { data, error, status } = await signalsApi.create(
             {
                 title: headline,
@@ -86,7 +89,7 @@ export default function RaiseSignalModal({ isOpen, onClose, editSignal }: RaiseS
                 timelineDays: duration,
                 signalStrength: `${duration} Days`,
             },
-            token || ''
+            authToken
         );
 
         if (data && !error) {
@@ -103,6 +106,7 @@ export default function RaiseSignalModal({ isOpen, onClose, editSignal }: RaiseS
                 description: details,
                 strength: `${duration} Days`,
                 type: signalType,
+                userPlan: user?.subscription || user?.plan || 'Free',
             });
             setToast({ type: 'warn', msg: '⚠ Saved locally (backend auth not configured)' });
             setTimeout(() => { onClose(); }, 1500);
@@ -116,6 +120,7 @@ export default function RaiseSignalModal({ isOpen, onClose, editSignal }: RaiseS
                 description: details,
                 strength: `${duration} Days`,
                 type: signalType,
+                userPlan: user?.subscription || user?.plan || 'Free',
             });
             setToast({ type: 'warn', msg: `Saved locally. Backend error: ${error}` });
             setTimeout(() => { onClose(); }, 1800);

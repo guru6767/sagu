@@ -21,9 +21,11 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import Sidebar from '@/components/feed/Sidebar'
+import MobileBottomNav from '@/components/feed/MobileBottomNav'
+import VerifiedAvatar from '@/components/feed/VerifiedAvatar'
 import { signalsApi, ApiSignal, usersApi, ApiUser } from '@/lib/apiClient'
 import { useAuthStore } from '@/store/useAuthStore'
-import { useSignalStore } from '@/store/useSignalStore'
+import { useSignalStore, getSignalExpiration } from '@/store/useSignalStore'
 import { useNetworkStore } from '@/store/useNetworkStore'
 import { useResponseStore } from '@/store/useResponseStore'
 
@@ -110,17 +112,15 @@ export default function SignalDetailPage() {
     const alreadyResponded = hasResponded(signal.id)
 
     // Calculate time details
-    const createdAt = signal.createdAt ? new Date(signal.createdAt) : new Date()
-    const totalDuration = parseInt(signal.signalStrength) || 7
-    const daysElapsed = Math.floor((Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24))
-    const daysLeft = Math.max(0, totalDuration - daysElapsed)
+    const createdAt = signal.createdAt ? new Date(signal.createdAt) : new Date(Date.now() - (1000 * 60 * 60 * 24))
+    const { isExpired, daysLeft, hoursLeft, totalDuration, progressPercent } = getSignalExpiration(signal)
 
     return (
         <div className="min-h-screen bg-background flex justify-center">
-            <div className="max-w-[1400px] w-full flex">
+            <div className="max-w-[1400px] w-full flex flex-col md:flex-row pb-16 md:pb-0">
                 <Sidebar />
 
-                <main className="flex-1 max-w-[900px] border-r border-border min-h-screen p-8">
+                <main className="flex-1 w-full max-w-[900px] md:border-r border-border min-h-screen p-4 md:p-8">
                     {/* Top Navigation */}
                     <div className="flex items-center justify-between mb-8">
                         <button 
@@ -158,8 +158,8 @@ export default function SignalDetailPage() {
                                     </div>
                                     <div className="flex items-center gap-1.5 font-medium">
                                         <Clock className="w-4 h-4" />
-                                        <span className={daysLeft <= 2 ? 'text-accent-red font-bold' : ''}>
-                                            {daysLeft} days left
+                                        <span className={daysLeft <= 1 ? 'text-accent-red font-bold' : ''}>
+                                            {isExpired ? 'Expired' : (daysLeft > 0 ? `${daysLeft} days left` : `${hoursLeft} hours left`)}
                                         </span>
                                     </div>
                                 </div>
@@ -173,17 +173,17 @@ export default function SignalDetailPage() {
                                         <p className="text-lg font-medium">{signal.signalStrength} Priority</p>
                                     </div>
                                     <div className="text-right">
-                                        <p className="text-2xl font-mono font-bold">{Math.round((daysLeft/totalDuration)*100)}%</p>
+                                        <p className="text-2xl font-mono font-bold">{Math.round(progressPercent)}%</p>
                                         <p className="text-[10px] uppercase font-bold text-text-muted">Life remaining</p>
                                     </div>
                                 </div>
                                 <div className="w-full h-3 bg-white/50 rounded-full overflow-hidden border border-border/30">
                                     <motion.div 
                                         initial={{ width: 0 }}
-                                        animate={{ width: `${(daysLeft/totalDuration)*100}%` }}
+                                        animate={{ width: `${progressPercent}%` }}
                                         transition={{ duration: 1.5, ease: "easeOut" }}
                                         className={`h-full rounded-full ${
-                                            daysLeft <= 2 ? "bg-accent-red" : "bg-primary"
+                                            daysLeft <= 1 ? "bg-accent-red" : "bg-primary"
                                         }`}
                                     />
                                 </div>
@@ -227,7 +227,7 @@ export default function SignalDetailPage() {
                                 {/* Main Reply Box */}
                                 <div className="flex gap-4 bg-surface-2 p-4 rounded-2xl border border-border/30 focus-within:border-primary/30 transition-all">
                                     <div className="w-10 h-10 rounded-full bg-white border border-border shrink-0 overflow-hidden relative">
-                                        <Image src={`https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(currentUser?.username || 'anon')}`} fill alt="me" />
+                                        <Image src={`https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(currentUser?.username || 'anon')}`} fill alt="me" unoptimized />
                                     </div>
                                     <div className="flex-1 space-y-3">
                                         <textarea 
@@ -265,7 +265,7 @@ export default function SignalDetailPage() {
                                         (signal as any).comments.map((comment: any) => (
                                             <div key={comment.id} className="flex gap-4 group">
                                                 <div className="w-8 h-8 rounded-full bg-surface-2 border border-border shrink-0 overflow-hidden relative">
-                                                    <Image src={`https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(comment.username)}`} fill alt={comment.username} />
+                                                    <Image src={`https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(comment.username)}`} fill alt={comment.username} unoptimized />
                                                 </div>
                                                 <div className="flex-1 space-y-1">
                                                     <div className="flex items-center gap-2">
@@ -288,9 +288,14 @@ export default function SignalDetailPage() {
                                 <div className="h-4 bg-primary relative" />
                                 <div className="px-6 pb-6 pt-4 space-y-4">
                                     <div className="flex items-center gap-4">
-                                        <div className="rounded-2xl border-2 border-border bg-white w-16 h-16 overflow-hidden relative shrink-0">
-                                            <Image src={`https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(signal.username)}`} fill alt={signal.username} className="object-cover" />
-                                        </div>
+                                        <VerifiedAvatar
+                                            username={signal.username}
+                                            avatarUrl={owner?.avatarUrl}
+                                            plan={owner?.plan}
+                                            size="w-16 h-16"
+                                            badgeSize="w-5 h-5"
+                                            className="rounded-2xl"
+                                        />
                                         <div>
                                             <h3 className="text-xl font-display leading-tight">{owner?.name || signal.username}</h3>
                                             <p className="text-xs text-text-muted font-mono uppercase tracking-widest mt-0.5">@{signal.username}</p>
@@ -360,6 +365,7 @@ export default function SignalDetailPage() {
                         </div>
                     </div>
                 </main>
+                <MobileBottomNav />
             </div>
         </div>
     )

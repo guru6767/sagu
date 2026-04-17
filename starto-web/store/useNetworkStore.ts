@@ -28,7 +28,7 @@ interface NetworkState {
     sentRequests: Connection[];      // outgoing requests
     offers: Offer[];
     
-    sendRequest: (signalId: string, message: string, token: string) => Promise<void>;
+    sendRequest: (signalId: string, message: string, token: string, targetUsername?: string) => Promise<void>;
     fetchRequests: (token: string) => Promise<void>;
     acceptRequest: (connectionId: string, token: string) => Promise<void>;
     rejectRequest: (connectionId: string, token: string) => Promise<void>;
@@ -46,13 +46,36 @@ export const useNetworkStore = create<NetworkState>()(
             sentRequests: [],
             offers: [],
 
-            sendRequest: async (signalId, message, token) => {
-                const { error } = await connectionsApi.sendRequest(signalId, message, token);
-                if (!error) {
-                    await get().fetchRequests(token);
-                } else {
-                    console.error('Failed to send request:', error);
-                    throw new Error(error);
+            sendRequest: async (signalId, message, token, targetUsername) => {
+                let success = false;
+                if (token && token !== 'mock-token') {
+                    try {
+                        const { error } = await connectionsApi.sendRequest(signalId, message, token);
+                        if (!error) {
+                            await get().fetchRequests(token);
+                            success = true;
+                        } else {
+                            console.error('Backend sendRequest error:', error);
+                        }
+                    } catch (e) {
+                        console.error('Failed to send request:', e);
+                    }
+                }
+                
+                if (!success) {
+                    // Fallback to local
+                    set(state => ({
+                        sentRequests: [
+                            ...state.sentRequests.filter(r => r.username !== targetUsername), // replace if exists
+                            {
+                                id: Date.now().toString(),
+                                username: targetUsername || 'unknown',
+                                category: 'General',
+                                timeAdded: Date.now(),
+                                status: 'pending'
+                            }
+                        ]
+                    }));
                 }
             },
 
@@ -150,23 +173,50 @@ export const useNetworkStore = create<NetworkState>()(
             },
 
             acceptRequest: async (requestId, token) => {
-                if (!token) return;
-                try {
-                    await connectionsApi.accept(requestId, token);
-                    await get().fetchRequests(token);
-                } catch (error) {
-                    console.error('Failed to accept request:', error);
+                if (token) {
+                    try {
+                        const { error } = await connectionsApi.accept(requestId, token);
+                        if (!error) {
+                            await get().fetchRequests(token);
+                            return;
+                        }
+                    } catch (error) {
+                        console.error('Failed to accept request:', error);
+                    }
                 }
+                
+                // Fallback / local mode
+                set(state => {
+                    const req = state.pendingRequests.find(r => r.id === requestId || r.username === requestId);
+                    if (!req) return state;
+                    return {
+                        pendingRequests: state.pendingRequests.filter(r => r !== req),
+                        connections: [...state.connections, { ...req, status: 'ACCEPTED' }]
+                    };
+                });
             },
 
             rejectRequest: async (requestId, token) => {
-                if (!token) return;
-                try {
-                    await connectionsApi.reject(requestId, token);
-                    await get().fetchRequests(token);
-                } catch (error) {
-                    console.error('Failed to reject request:', error);
+                if (token) {
+                    try {
+                        const { error } = await connectionsApi.reject(requestId, token);
+                        if (!error) {
+                            await get().fetchRequests(token);
+                            return;
+                        }
+                    } catch (error) {
+                        console.error('Failed to reject request:', error);
+                    }
                 }
+                
+                // Fallback / local mode
+                set(state => {
+                    const req = state.pendingRequests.find(r => r.id === requestId || r.username === requestId);
+                    if (!req) return state;
+                    return {
+                        pendingRequests: state.pendingRequests.filter(r => r !== req)
+                    };
+                });
             },
             
             clearAll: () => set({ connections: [], pendingRequests: [], sentRequests: [], offers: [] }),

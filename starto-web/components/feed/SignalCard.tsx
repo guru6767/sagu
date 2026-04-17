@@ -5,13 +5,14 @@ import { motion, AnimatePresence } from 'framer-motion'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useState, useRef, useEffect } from 'react'
-import { useSignalStore, Signal, Comment } from '@/store/useSignalStore'
+import { useSignalStore, Signal, Comment, getSignalExpiration } from '@/store/useSignalStore'
 import { useAuthStore } from '@/store/useAuthStore'
 import { useNetworkStore } from '@/store/useNetworkStore'
 import { useResponseStore } from '@/store/useResponseStore'
 import RaiseSignalModal from './RaiseSignalModal'
 import InsightsModal from './InsightsModal'
 import HelpModal from './HelpModal'
+import VerifiedAvatar from './VerifiedAvatar'
 
 // ── @Mention hook — searches all known usernames in the store ────────────────
 function useMentionSuggestions(text: string) {
@@ -175,9 +176,10 @@ interface SignalCardProps {
     }
     hideViews?: boolean
     userPlan?: string
+    createdAt?: number | string
 }
 
-export default function SignalCard({ id, title, username, timeAgo, category, description, strength, stats, hideViews = false, userPlan = 'free' }: SignalCardProps) {
+export default function SignalCard({ id, title, username, timeAgo, category, description, strength, stats, hideViews = false, userPlan = 'free', createdAt }: SignalCardProps) {
     const { user, token } = useAuthStore()
     const currentUser = user?.username
     const { deleteSignal, signals } = useSignalStore()
@@ -212,12 +214,9 @@ export default function SignalCard({ id, title, username, timeAgo, category, des
     const isOwner = currentUser === username
     const currentSignal = signals.find(s => s.id === id)
 
-    // Days left calculation
-    const totalDuration = parseInt(strength) || 7;
-    // Determine creation time, defaulting to 1 day ago if legacy signal created before this feature
-    const safeCreatedAt = currentSignal?.createdAt ? new Date(currentSignal.createdAt).getTime() : (Date.now() - (1000 * 60 * 60 * 24));
-    const daysElapsed = Math.floor((Date.now() - safeCreatedAt) / (1000 * 60 * 60 * 24));
-    const daysLeft = Math.max(0, totalDuration - daysElapsed);
+    // Days left calculation using helper
+    const { isExpired, daysLeft, hoursLeft, totalDuration, progressPercent } = getSignalExpiration(currentSignal || { strength, createdAt } as any);
+    
     const strengthColor: Record<string, string> = {
         Normal: 'bg-accent-blue',
         High: 'bg-accent-yellow',
@@ -241,17 +240,15 @@ export default function SignalCard({ id, title, username, timeAgo, category, des
         >
             <div className="flex justify-between items-start mb-4">
                 <Link href={`/profile/${username}`} className="flex items-center gap-3 group/profile hover:opacity-80 transition-opacity">
-                    <div className="w-10 h-10 bg-surface-2 rounded-full border border-border relative overflow-hidden">
-                        <Image src={`https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(username)}`} alt={username} fill className="object-cover" />
-                    </div>
+                    <VerifiedAvatar
+                        username={username}
+                        plan={userPlan}
+                        size="w-10 h-10"
+                        badgeSize="w-4 h-4"
+                    />
                     <div>
                     <div className="flex items-center gap-2 overflow-hidden">
                         <span className="text-sm font-bold truncate hover:underline cursor-pointer">{username}</span>
-                        {(userPlan === 'Pro' || userPlan === 'Founder' || userPlan?.toLowerCase() === 'premium') && (
-                            <div className="text-primary" title="Verified Member">
-                                <BadgeCheck className="w-4 h-4" />
-                            </div>
-                        )}
                         <span className="text-text-muted text-xs shrink-0">•</span>
                         <span className="text-text-muted text-[10px] font-bold uppercase tracking-widest shrink-0">{timeAgo}</span>
                     </div>
@@ -332,21 +329,21 @@ export default function SignalCard({ id, title, username, timeAgo, category, des
                 <div className="w-full h-1.5 bg-surface-2 overflow-hidden mb-1 flex">
                     <motion.div 
                         initial={{ width: 0 }}
-                        animate={{ width: `${Math.min(100, Math.max(0, (daysLeft / totalDuration) * 100))}%` }}
+                        animate={{ width: `${progressPercent}%` }}
                         transition={{ duration: 1, delay: 0.2, ease: "easeOut" }}
                         className={`h-full rounded-r-md transition-colors ${
-                            daysLeft <= 3 ? "bg-red-500" :
+                            daysLeft <= 1 ? "bg-red-500" :
                             daysLeft >= totalDuration - 2 ? "bg-green-500" :
                             "bg-gradient-to-r from-yellow-400 to-orange-500"
                         }`}
                     />
                 </div>
                 <div className={`text-[10px] uppercase tracking-widest font-bold float-right ${
-                    daysLeft <= 3 ? "text-red-500" :
+                    daysLeft <= 1 ? "text-red-500" :
                     daysLeft >= totalDuration - 2 ? "text-green-600" :
                     "text-orange-500"
                 }`}>
-                    {daysLeft} Days Left
+                    {daysLeft > 0 ? `${daysLeft} Days Left` : `${hoursLeft} Hours Left`}
                 </div>
                 <div className="clear-both" />
             </div>
@@ -356,7 +353,7 @@ export default function SignalCard({ id, title, username, timeAgo, category, des
                 <div className="mb-4 flex items-center gap-2">
                     <div className="flex -space-x-2">
                         <div className="w-5 h-5 rounded-full border border-white bg-surface-2 relative overflow-hidden">
-                            <Image src={`https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(respondentToShow)}`} alt="proof" fill className="object-cover" />
+                            <Image src={`https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(respondentToShow)}`} alt="proof" fill className="object-cover" unoptimized />
                         </div>
                     </div>
                     <p className="text-[11px] text-text-secondary">
@@ -386,16 +383,11 @@ export default function SignalCard({ id, title, username, timeAgo, category, des
                 <button
                     onClick={async () => {
                         if (!isOwner && !alreadyConnected && !alreadyPending && !addedToNetwork) {
-                            if (!token) {
-                                alert('Please login to connect');
-                                return;
-                            }
                             try {
-                                await sendRequest(id, 'I want to connect!', token);
+                                await sendRequest(id, 'I want to connect!', token || 'mock-token', currentSignal?.username);
                                 setAddedToNetwork(true);
-                                setTimeout(() => setAddedToNetwork(false), 2000);
                             } catch (err) {
-                                // Error handled in store or already alerted
+                                // Error handled in store
                             }
                         }
                     }}
@@ -404,18 +396,22 @@ export default function SignalCard({ id, title, username, timeAgo, category, des
                         isOwner
                             ? 'border-border opacity-30 cursor-not-allowed'
                             : alreadyConnected
-                                ? 'border-green-500 bg-green-50'
+                                ? 'bg-black text-white'
                                 : alreadyPending || addedToNetwork
-                                    ? 'border-green-300 bg-green-50'
+                                    ? 'bg-black text-white shadow-md'
                                     : 'border-border hover:bg-surface-2'
                     }`}
                     title={isOwner ? 'Your own signal' : alreadyConnected ? 'Connected' : alreadyPending ? 'Request sent — pending' : 'Send connection request'}
                 >
                     {alreadyConnected ? (
-                        <CheckCheck className="w-4 h-4 text-green-600" />
+                        <CheckCheck className="w-4 h-4" />
                     ) : alreadyPending || addedToNetwork ? (
-                        <motion.div initial={{ scale: 0.7, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
-                            <CheckCheck className="w-4 h-4 text-green-500" />
+                        <motion.div 
+                            initial={{ scale: 0.5, opacity: 0 }} 
+                            animate={{ scale: [0.8, 1.2, 1], rotate: [0, -10, 10, -10, 0], opacity: 1 }} 
+                            transition={{ type: "tween", duration: 0.4 }}
+                        >
+                            <CheckCheck className="w-4 h-4" />
                         </motion.div>
                     ) : (
                         <UserPlus className="w-4 h-4" />
@@ -449,8 +445,8 @@ export default function SignalCard({ id, title, username, timeAgo, category, des
 
                         {/* Main Comment Input */}
                         <div className="mt-4 flex gap-2 items-center border-t border-border pt-3">
-                            <div className="w-8 h-8 rounded-full bg-surface-2 overflow-hidden shrink-0 relative">
-                                <Image src={`https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(currentUser || 'user')}`} alt="me" fill className="object-cover" />
+                            <div className="w-8 h-8 rounded-full border border-border bg-surface-2 relative overflow-hidden shrink-0">
+                                <Image src={`https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(currentUser || 'user')}`} alt="me" fill className="object-cover" unoptimized />
                             </div>
                             <input
                                 type="text"

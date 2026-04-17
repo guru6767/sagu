@@ -1,11 +1,12 @@
 "use client"
 
 import Sidebar from '@/components/feed/Sidebar'
+import MobileBottomNav from '@/components/feed/MobileBottomNav'
 import { MapPin, Globe, Twitter, Linkedin, Github, Signal, Zap, Camera, Upload, Users, BadgeCheck, Star, Edit3, Check, X, Link as LinkIcon, Clock } from 'lucide-react'
 import Image from 'next/image'
 import { useState, useRef, useEffect } from 'react'
 import { useAuthStore } from '@/store/useAuthStore'
-import { useSignalStore } from '@/store/useSignalStore'
+import { useSignalStore, getSignalExpiration } from '@/store/useSignalStore'
 import { useNetworkStore } from '@/store/useNetworkStore'
 import { useRatingStore } from '@/store/useRatingStore'
 import { useResponseStore } from '@/store/useResponseStore'
@@ -53,11 +54,12 @@ export default function UserProfile() {
 
     const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000
     const mySignals = signals.filter(s => s.username === username)
-    const activeSignals = mySignals.filter(s => s.status === 'Active')
-    const pastSignals = mySignals.filter(s => s.status === 'Solved' || (s.createdAt && Date.now() - s.createdAt >= SEVEN_DAYS))
+    const activeSignals = mySignals.filter(s => s.status === 'Active' && !getSignalExpiration(s).isExpired)
+    const pastSignals = mySignals.filter(s => s.status === 'Solved' || getSignalExpiration(s).isExpired)
     const avgRating = getAverageRating(username)
     const myRatings = getRatingsFor(username)
     const [activeTab, setActiveTab] = useState<'active' | 'past' | 'responses'>('active')
+    const [showAllActiveSignals, setShowAllActiveSignals] = useState(false)
 
     const [isEditing, setIsEditing] = useState(false)
     const [isEditingSocial, setIsEditingSocial] = useState(false)
@@ -189,12 +191,12 @@ export default function UserProfile() {
 
     return (
         <div className="min-h-screen bg-background flex justify-center">
-            <div className="max-w-[1400px] w-full flex">
+            <div className="max-w-[1400px] w-full flex flex-col md:flex-row pb-16 md:pb-0">
                 <Sidebar />
 
                 <input type="file" ref={fileInputRef} className="hidden" onChange={(e) => onFileChange(e, 'profile')} accept="image/*" />
 
-                <main className="flex-1 max-w-[680px] border-r border-border min-h-screen p-0">
+                <main className="flex-1 w-full max-w-[680px] md:border-r border-border min-h-screen p-0">
 
                     {/* ── Clean Profile Header (no cover) ── */}
                     <div className="px-8 pt-8 pb-6 border-b border-border">
@@ -221,7 +223,7 @@ export default function UserProfile() {
                             <div className="flex-1 min-w-0">
                                 {isEditing ? (
                                     <div className="space-y-4">
-                                        <div className="flex gap-3">
+                                        <div className="flex flex-col sm:flex-row gap-3">
                                             <div className="flex-1">
                                                 <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted mb-1 block">Full Name</label>
                                                 <input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} className="w-full bg-surface-1 border border-border p-2 rounded-md font-display text-xl focus:ring-1 focus:ring-primary outline-none" />
@@ -231,7 +233,7 @@ export default function UserProfile() {
                                                 <input value={editForm.role} onChange={(e) => setEditForm({ ...editForm, role: e.target.value })} className="w-full bg-surface-1 border border-border p-2 rounded-md text-sm focus:ring-1 focus:ring-primary outline-none" />
                                             </div>
                                         </div>
-                                        <div className="flex gap-3">
+                                        <div className="flex flex-col sm:flex-row gap-3">
                                             <div className="flex-1">
                                                 <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted mb-1 block">Location</label>
                                                 <div className="relative"><MapPin className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" /><input value={editForm.city} onChange={(e) => setEditForm({ ...editForm, city: e.target.value })} className="w-full bg-surface-1 border border-border p-2 pl-8 rounded-md text-sm focus:ring-1 focus:ring-primary outline-none" /></div>
@@ -259,7 +261,11 @@ export default function UserProfile() {
                                     <>
                                         <div className="flex items-center gap-2 mb-0.5">
                                             <h1 className="text-2xl font-display">{name}</h1>
-                                            {(isVerified || subscription !== 'Free') && <BadgeCheck className="w-5 h-5 fill-primary text-white" />}
+                                            {(isVerified || subscription === 'Pro' || subscription === 'Founder') && (
+                                                <span title={`${subscription} Verified`} className="relative inline-flex items-center justify-center">
+                                                    <BadgeCheck className="w-6 h-6 fill-black text-white" />
+                                                </span>
+                                            )}
                                         </div>
                                         <p className="text-text-secondary text-sm font-medium mb-1 flex items-center gap-2">
                                             {role} • {city}
@@ -271,7 +277,7 @@ export default function UserProfile() {
                                         ) : (
                                             <p className="text-sm text-text-muted italic mb-3">No bio yet — click Edit Profile to add one.</p>
                                         )}
-                                        <div className="flex gap-8 mb-3">
+                                        <div className="flex gap-4 sm:gap-8 mb-3">
                                             <div><p className="text-[10px] uppercase font-bold text-text-muted">Signals</p><p className="text-xl font-mono font-bold">{mySignals.length}</p></div>
                                             <div><p className="text-[10px] uppercase font-bold text-text-muted">Connections</p><p className="text-xl font-mono font-bold">{connections.length}</p></div>
                                             <div>
@@ -296,7 +302,7 @@ export default function UserProfile() {
 
                     {/* Signals Feed Section */}
                     <div className="p-8">
-                        <div className="flex items-center gap-8 border-b border-border mb-8">
+                        <div className="flex items-center gap-6 sm:gap-8 border-b border-border mb-8 overflow-x-auto whitespace-nowrap">
                             <button
                                 onClick={() => setActiveTab('active')}
                                 className={`pb-4 border-b-2 font-bold text-xs uppercase tracking-widest transition-all ${
@@ -332,20 +338,32 @@ export default function UserProfile() {
                                         <p className="text-sm">No active signals. Raise one from the Home Feed!</p>
                                     </div>
                                 ) : (
-                                    activeSignals.map(signal => (
-                                        <div key={signal.id} className="p-6 bg-surface-2 rounded-2xl border border-border group hover:border-primary transition-all">
-                                            <div className="flex justify-between items-start mb-4">
-                                                <span className="text-[10px] px-2 py-0.5 bg-black text-white rounded-full uppercase font-bold tracking-widest">{signal.category}</span>
-                                                <span className="text-[10px] font-bold text-green-500 uppercase tracking-widest">● Active</span>
+                                    <>
+                                        {(showAllActiveSignals ? activeSignals : activeSignals.slice(0, 3)).map(signal => (
+                                            <div key={signal.id} className="p-6 bg-surface-2 rounded-2xl border border-border group hover:border-primary transition-all mb-4">
+                                                <div className="flex justify-between items-start mb-4">
+                                                    <span className="text-[10px] px-2 py-0.5 bg-black text-white rounded-full uppercase font-bold tracking-widest">{signal.category}</span>
+                                                    <span className="text-[10px] font-bold text-green-500 uppercase tracking-widest">● Active</span>
+                                                </div>
+                                                <h3 className="text-xl font-display mb-2 group-hover:text-primary transition-colors">{signal.title}</h3>
+                                                <p className="text-sm text-text-secondary line-clamp-2">{signal.description}</p>
+                                                <div className="mt-4 pt-4 border-t border-border flex justify-between text-[10px] font-bold uppercase tracking-widest">
+                                                    <span className="flex items-center gap-1.5"><Zap className="w-3.5 h-3.5 text-primary" /> {signal.stats.responses} Responses</span>
+                                                    <span className={`${getSignalExpiration(signal).daysLeft <= 1 ? 'text-red-500' : 'text-text-muted'}`}>
+                                                        Expires in {getSignalExpiration(signal).daysLeft > 0 ? `${getSignalExpiration(signal).daysLeft} days` : `${getSignalExpiration(signal).hoursLeft} hours`}
+                                                    </span>
+                                                </div>
                                             </div>
-                                            <h3 className="text-xl font-display mb-2 group-hover:text-primary transition-colors">{signal.title}</h3>
-                                            <p className="text-sm text-text-secondary line-clamp-2">{signal.description}</p>
-                                            <div className="mt-4 pt-4 border-t border-border flex justify-between text-[10px] font-bold uppercase tracking-widest">
-                                                <span className="flex items-center gap-1.5"><Zap className="w-3.5 h-3.5 text-primary" /> {signal.stats.responses} Responses</span>
-                                                <span className="text-text-muted">Expires in 7 days</span>
-                                            </div>
-                                        </div>
-                                    ))
+                                        ))}
+                                        {activeSignals.length > 3 && (
+                                            <button
+                                                onClick={() => setShowAllActiveSignals(!showAllActiveSignals)}
+                                                className="w-full py-3 rounded-xl border border-border text-sm font-bold hover:bg-surface-2 transition-all mt-2 text-black"
+                                            >
+                                                {showAllActiveSignals ? 'View Less' : `View All ${activeSignals.length} Signals`}
+                                            </button>
+                                        )}
+                                    </>
                                 )
                             )}
 
@@ -558,15 +576,41 @@ export default function UserProfile() {
                         )}
                     </div>
 
+                    {/* Upgrade CTA */}
                     <div className="bg-primary p-6 rounded-2xl text-white shadow-xl relative overflow-hidden group">
                         <div className="relative z-10">
-                            <h3 className="font-display text-xl mb-2">Need Beta Testing?</h3>
-                            <p className="text-white/70 text-sm mb-6 leading-relaxed">Connect with our QA nodes and launch your MVP without bugs.</p>
-                            <button className="w-full bg-white text-black py-3 rounded-xl font-bold uppercase tracking-widest text-[10px] hover:bg-surface-2 transition-colors">Start Hiring</button>
+                            <h3 className="font-display text-xl mb-2">
+                                {subscription === 'Free' ? 'Upgrade Your Plan' : 'Manage Your Plan'}
+                            </h3>
+                            <p className="text-white/70 text-sm mb-6 leading-relaxed">
+                                {subscription === 'Free'
+                                    ? 'Unlock verified badges, unlimited signals, and AI market intelligence.'
+                                    : 'View your current benefits, usage, and manage your subscription.'}
+                            </p>
+                            <button
+                                onClick={() => router.push('/subscription')}
+                                className="w-full bg-white text-black py-3 rounded-xl font-bold uppercase tracking-widest text-[10px] hover:bg-surface-2 transition-colors"
+                            >
+                                {subscription === 'Free' ? 'Upgrade Now →' : 'View Plan →'}
+                            </button>
                         </div>
                         <Signal className="absolute -bottom-10 -right-10 w-48 h-48 opacity-10 rotate-12 group-hover:rotate-45 transition-transform duration-1000" />
                     </div>
+
+                    {/* Sponsored Card */}
+                    <div className="bg-white border border-border p-6 rounded-2xl shadow-sm">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-text-muted mb-3">Sponsored</p>
+                        <h3 className="font-display text-lg mb-2 leading-snug">Want to run ads here?</h3>
+                        <p className="text-sm text-text-secondary leading-relaxed mb-5">Reach 1000s of founders, investors &amp; mentors in our ecosystem.</p>
+                        <button
+                            onClick={() => router.push('/subscription')}
+                            className="w-full bg-black text-white py-3 rounded-2xl font-bold uppercase tracking-widest text-[10px] hover:bg-primary transition-colors"
+                        >
+                            Get started →
+                        </button>
+                    </div>
                 </aside>
+                <MobileBottomNav />
             </div>
         </div>
     )
