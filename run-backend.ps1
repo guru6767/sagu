@@ -20,7 +20,8 @@ if ($jdkPath) {
     if ($javaPath) {
         $env:JAVA_HOME = [System.IO.Path]::GetDirectoryName([System.IO.Path]::GetDirectoryName($javaPath))
     } else {
-        $env:JAVA_HOME = "C:\Program Files\Java\jdk-23" # Fallback
+        # Fix #2: runtime must be Java 21 (LTS). Install JDK 21 if missing.
+        $env:JAVA_HOME = "C:\Program Files\Java\jdk-21" # Fallback — requires JDK 21
     }
 }
 $env:Path = "$env:JAVA_HOME\bin;" + $env:Path

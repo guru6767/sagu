@@ -5,11 +5,15 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
-import java.util.Map;
 
 import java.time.OffsetDateTime;
+import java.util.Map;
 import java.util.UUID;
 
+// Fix #3: @AllArgsConstructor + @Builder.Default causes the default to be silently
+// dropped when an all-args constructor is used directly. Replace @AllArgsConstructor
+// with @Builder only — all construction must go through the builder so @Builder.Default
+// values are always applied.
 @Entity
 @Table(name = "notifications",
     indexes = {
@@ -19,7 +23,6 @@ import java.util.UUID;
 )
 @Data
 @NoArgsConstructor
-@AllArgsConstructor
 @Builder
 public class Notification {
     @Id
@@ -39,8 +42,8 @@ public class Notification {
     private String body;
 
     @JdbcTypeCode(SqlTypes.JSON)
-@Column(columnDefinition = "jsonb")
-private Map<String, Object> data;
+    @Column(columnDefinition = "jsonb")
+    private Map<String, Object> data;
 
     @Column(name = "is_read")
     @Builder.Default
@@ -49,6 +52,4 @@ private Map<String, Object> data;
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private OffsetDateTime createdAt;
-
-   
 }

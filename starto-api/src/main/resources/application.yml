@@ -8,7 +8,9 @@ spring:
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
-      ddl-auto: update
+      # PROD: use 'validate' — schema is managed by schema.sql / Flyway, not Hibernate DDL.
+      # LOCAL: set env var SPRING_JPA_HIBERNATE_DDL_AUTO=update to allow auto-creation during dev.
+      ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:validate}
     show-sql: false
     open-in-view: false
     properties:
@@ -38,6 +40,7 @@ logging:
     root: INFO
 
 server:
+  # Fix #1: canonical port is 8080. Set PORT env var to override (e.g. PORT=8081 for local legacy).
   port: ${PORT:8080}
 
 openai:
@@ -50,6 +53,9 @@ google:
     api-key: ${GOOGLE_MAPS_API_KEY:}
 
 firebase:
+  # Fix #6: prefer base64 inline JSON via FIREBASE_SERVICE_ACCOUNT_B64 env var.
+  # Fallback to file path for local dev only.
+  service-account-b64: ${FIREBASE_SERVICE_ACCOUNT_B64:}
   config-path: ${FIREBASE_CONFIG_PATH:src/main/resources/firebase-service-account.json}
 
 razorpay:

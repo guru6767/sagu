@@ -3,14 +3,18 @@ package com.starto.model;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+// Fix #3: @AllArgsConstructor + @Builder.Default causes 'type' and 'status' defaults to
+// be silently ignored when an all-args constructor is invoked directly. Removing
+// @AllArgsConstructor forces all instantiation through the Lombok builder, ensuring
+// @Builder.Default values ("respond", "pending") are always applied.
 @Entity
 @Table(name = "responses")
 @Data
 @NoArgsConstructor
-@AllArgsConstructor
 @Builder
 public class Response {
     @Id

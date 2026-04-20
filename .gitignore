@@ -55,6 +55,11 @@ application-local.properties
 *.p12
 *.jks
 
+# Fix #4: private key files must NEVER be committed.
+# The committed private_key.pem MUST be rotated immediately.
+*.pem
+private_key.pem
+
 # ===== Firebase =====
 firebase-service-account.json
 

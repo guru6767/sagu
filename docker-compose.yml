@@ -62,7 +62,11 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      # Fix #6: set base64-encoded Firebase JSON here instead of mounting a file
+      FIREBASE_SERVICE_ACCOUNT_B64: ${FIREBASE_SERVICE_ACCOUNT_B64:-}
       FIREBASE_CONFIG_PATH: /app/firebase-service-account.json
+      # Fix #7: prod = validate; override to 'update' for local docker dev
+      SPRING_JPA_HIBERNATE_DDL_AUTO: ${SPRING_JPA_HIBERNATE_DDL_AUTO:-validate}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-dummy_key}
