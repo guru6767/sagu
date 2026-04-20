@@ -14,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.security.core.Authentication;
+import jakarta.validation.Valid;
 
 import java.util.List;
 import java.util.Map;
@@ -32,7 +33,7 @@ public class SignalController {
  @PostMapping
 public ResponseEntity<?> createSignal(
         Authentication authentication,
-        @RequestBody SignalRequestDTO dto) {
+        @Valid @RequestBody SignalRequestDTO dto) {
 
     if (authentication == null || authentication.getPrincipal() == null)
         return ResponseEntity.status(401).build();

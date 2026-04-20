@@ -1,0 +1,67 @@
+// firestore.rules
+// Fix #6: Remove unauthenticated read access.
+// All reads and writes require a valid Firebase Authentication token.
+// Users can only read/write their own data; admin operations are server-side only
+// (Firebase Admin SDK bypasses these rules entirely).
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── helpers ──────────────────────────────────────────────────────────────
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isValidString(field, maxLen) {
+      return field is string && field.size() <= maxLen;
+    }
+
+    // ── users ─────────────────────────────────────────────────────────────────
+
+    match /users/{userId} {
+      // Only the authenticated user can read or write their own document
+      allow read, update: if isOwner(userId);
+
+      // New account creation: uid must match the document id
+      allow create: if isOwner(userId)
+                    && isValidString(request.resource.data.email, 255)
+                    && isValidString(request.resource.data.name, 100);
+
+      // Nobody deletes their own user doc via client; deletion is server-side only
+      allow delete: if false;
+    }
+
+    // ── notifications ─────────────────────────────────────────────────────────
+
+    match /notifications/{notifId} {
+      // Users can only read notifications addressed to them
+      allow read: if isSignedIn()
+                  && resource.data.userId == request.auth.uid;
+
+      // Notifications are written server-side only; no client writes
+      allow write: if false;
+    }
+
+    // ── presence ─────────────────────────────────────────────────────────────
+
+    match /presence/{userId} {
+      // Any signed-in user can read presence (online/offline status)
+      allow read: if isSignedIn();
+
+      // Users can only update their own presence
+      allow write: if isOwner(userId);
+    }
+
+    // ── default: deny everything not explicitly allowed ────────────────────
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

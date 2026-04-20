@@ -1,27 +1,26 @@
 package com.starto.controller;
 
+import com.starto.dto.RegisterRequestDTO;
 import com.starto.model.User;
-import com.starto.repository.UserRepository;
 import com.starto.service.UserService;
-import lombok.RequiredArgsConstructor;
-
 import com.starto.service.EmailService;
 import com.starto.service.PasswordResetService;
+import com.starto.repository.UserRepository;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 
-import java.util.Map;
 import java.util.List;
-import java.util.Optional;
+import java.util.Map;
 
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.*;
 import org.springframework.security.core.Authentication;
-import com.starto.service.EmailService;
-import com.starto.repository.UserRepository;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
+@Validated
 public class AuthController {
 
     private final UserService userService;
@@ -29,97 +28,96 @@ public class AuthController {
     private final EmailService emailService;
     private final UserRepository userRepository;
 
-  
-    //saving the user details in DB
+    /**
+     * Fix #3: accept RegisterRequestDTO (validated) instead of raw User entity.
+     * @Valid activates bean validation — returns 400 + field errors on constraint violation.
+     *
+     * Fix #4: passwords are managed entirely by Firebase — no local BCrypt needed.
+     * Firebase Admin SDK handles all authentication; we store firebase_uid only, never passwords.
+     * BCryptPasswordEncoder is NOT wired because there are no locally stored passwords.
+     */
     @PostMapping("/register")
-public ResponseEntity<?> register(
-        Authentication authentication,
-        @RequestBody User userDetails) {
+    public ResponseEntity<?> register(
+            Authentication authentication,
+            @Valid @RequestBody RegisterRequestDTO dto) {
 
-    if (authentication == null || authentication.getPrincipal() == null) {
-        return ResponseEntity.status(401).body("Unauthorized");
-    }
-
-    String firebaseUid = authentication.getPrincipal().toString();
-
-    String name = userDetails.getName();
-    String email = userDetails.getEmail();
-    String phone = userDetails.getPhone();
-    String role = userDetails.getRole();
-
-    String city = userDetails.getCity();
-    String state = userDetails.getState();
-    String country = userDetails.getCountry();
-
-    User user = userService.createOrUpdateUser(
-            firebaseUid,
-            email,
-            name,
-            phone,
-            role,
-            city,
-            state,
-            country
-    );
-     emailService.sendWelcomeEmail(user);
-    return ResponseEntity.ok(user);
-}
-
-
-
-    //Getting the userDetails
-@GetMapping("/me")
-public ResponseEntity<?> getCurrentUser(Authentication authentication) {
-    if (authentication == null || authentication.getPrincipal() == null) {
-        return ResponseEntity.status(401).body("Unauthorized: Missing or invalid Firebase token");
-    }
-
-    // Your UID is stored as principal in the filter
-    String firebaseUid = authentication.getPrincipal().toString();
-    System.out.println("checking the /me mapping");
-    return userService.getUserByFirebaseUid(firebaseUid)
-            .map(ResponseEntity::ok)
-            .orElse(ResponseEntity.notFound().build());
-}
-
-
-
-  //forgot-password
-    @PostMapping("/forgot-password")
-    public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> body) {
-        String email = body.get("email");
-        if (email == null || email.isBlank()) {
-            return ResponseEntity.badRequest().body("Email is required");
+        if (authentication == null || authentication.getPrincipal() == null) {
+            return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
         }
-        passwordResetService.sendPasswordResetEmail(email);
+
+        String firebaseUid = authentication.getPrincipal().toString();
+
+        User user = userService.createOrUpdateUser(
+                firebaseUid,
+                dto.getEmail(),
+                dto.getName(),
+                dto.getPhone(),
+                dto.getRole(),
+                dto.getCity(),
+                dto.getState(),
+                dto.getCountry()
+        );
+
+        emailService.sendWelcomeEmail(user);
+        return ResponseEntity.ok(user);
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<?> getCurrentUser(Authentication authentication) {
+        if (authentication == null || authentication.getPrincipal() == null) {
+            return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+        }
+        String firebaseUid = authentication.getPrincipal().toString();
+        return userService.getUserByFirebaseUid(firebaseUid)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<?> forgotPassword(@Valid @RequestBody ForgotPasswordRequest body) {
+        passwordResetService.sendPasswordResetEmail(body.getEmail());
+        // Always return 200 — don't leak whether the email exists
         return ResponseEntity.ok(Map.of("message", "If this email is registered, a reset link has been sent."));
     }
 
-
-    //Resetting the password
     @PostMapping("/reset-password")
-    public ResponseEntity<?> resetPassword(Authentication authentication, @RequestBody Map<String, String> body) {
+    public ResponseEntity<?> resetPassword(
+            Authentication authentication,
+            @Valid @RequestBody ResetPasswordRequest body) {
+
         if (authentication == null || authentication.getPrincipal() == null) {
-            return ResponseEntity.status(401).body("Unauthorized");
-        }
-        String newPassword = body.get("newPassword");
-        if (newPassword == null || newPassword.length() < 8) {
-            return ResponseEntity.badRequest().body("Password must be at least 8 characters");
+            return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
         }
         String firebaseUid = authentication.getPrincipal().toString();
-        passwordResetService.updatePassword(firebaseUid, newPassword);
+        passwordResetService.updatePassword(firebaseUid, body.getNewPassword());
         return ResponseEntity.ok(Map.of("message", "Password updated successfully"));
     }
 
     @GetMapping("/avatars")
-public ResponseEntity<?> getAvatarOptions() {
-    return ResponseEntity.ok(Map.of("avatars", List.of(
-        "/avatars/avatar1.png",
-        "/avatars/avatar2.png",
-        "/avatars/avatar3.png",
-        "/avatars/avatar4.png"
-    )));
-}
+    public ResponseEntity<?> getAvatarOptions() {
+        return ResponseEntity.ok(Map.of("avatars", List.of(
+            "/avatars/avatar1.png",
+            "/avatars/avatar2.png",
+            "/avatars/avatar3.png",
+            "/avatars/avatar4.png"
+        )));
+    }
 
+    // ── inner request records ────────────────────────────────────────────────
 
+    /** Fix #3: validated inner DTO for forgot-password */
+    @lombok.Data
+    public static class ForgotPasswordRequest {
+        @jakarta.validation.constraints.NotBlank(message = "Email is required")
+        @jakarta.validation.constraints.Email(message = "Must be a valid email address")
+        private String email;
+    }
+
+    /** Fix #3: validated inner DTO for reset-password */
+    @lombok.Data
+    public static class ResetPasswordRequest {
+        @jakarta.validation.constraints.NotBlank(message = "New password is required")
+        @jakarta.validation.constraints.Size(min = 8, message = "Password must be at least 8 characters")
+        private String newPassword;
+    }
 }

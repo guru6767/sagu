@@ -43,6 +43,17 @@ server:
   # Fix #1: canonical port is 8080. Set PORT env var to override (e.g. PORT=8081 for local legacy).
   port: ${PORT:8080}
 
+# Fix #1: Auth strategy is Firebase ID tokens verified by Admin SDK using Google's
+# public keys — there is NO local JWT secret to store. Protect FIREBASE_SERVICE_ACCOUNT_B64
+# (see FirebaseConfig) and never commit firebase-service-account.json.
+#
+# Fix #2: CORS allowed origins loaded from env var — comma-separated list.
+# Prod: ALLOWED_ORIGINS=https://starto.in,https://app.starto.in
+# Local: leave unset (defaults to localhost:3000 and localhost:8080 in SecurityConfig)
+security:
+  cors:
+    allowed-origins: ${ALLOWED_ORIGINS:http://localhost:3000,http://localhost:8080}
+
 openai:
   api-key: ${OPENAI_API_KEY:dummy_key}
 
