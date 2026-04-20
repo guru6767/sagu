@@ -2,9 +2,10 @@ import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth } from 'firebase/auth';
 
 // ── Required env vars ─────────────────────────────────────────────────────────
-// All six must be present in .env.local (or CI env) for Firebase Auth to work.
-// If any are missing, we surface a clear error immediately rather than a cryptic
-// `auth/configuration-not-found` at runtime when a user tries to sign in/up.
+// All 6 must be present in starto-web/.env.local (copy from .env.example).
+// On missing vars we log a descriptive warning but do NOT throw — throwing at
+// module level crashes the entire Next.js app (white screen) before React even
+// mounts, giving the user no feedback at all.
 const REQUIRED_VARS = [
     'NEXT_PUBLIC_FIREBASE_API_KEY',
     'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN',
@@ -32,31 +33,32 @@ const firebaseConfig = {
     measurementId:     process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-// ── App singleton ─────────────────────────────────────────────────────────────
+// ── App + Auth singleton ──────────────────────────────────────────────────────
 // getApps().length guard prevents "Firebase App named '[DEFAULT]' already exists"
-// errors that occur during Next.js hot-reload and SSR module re-evaluation.
+// errors during Next.js hot-reload and SSR module re-evaluation.
 let app: FirebaseApp;
 let auth: Auth;
+let _firebaseConfigured = true;
 
 const missing = getMissingVars();
-
 if (missing.length > 0) {
-    // Throw once at module load time so the developer sees the exact missing key
-    // in the Next.js overlay, rather than a silent `{}` fallback that only fails
-    // later when a user submits the auth form.
-    const msg = `Firebase is not configured. Missing env var(s): ${missing.join(', ')}. Add them to starto-web/.env.local and restart the dev server.`;
-    console.error(`[firebase.ts] ${msg}`);
-    // In dev we throw; in production the catch below turns this into a safe no-op
-    // so the app can still render non-auth pages.
-    if (process.env.NODE_ENV === 'development') {
-        throw new Error(msg);
-    }
-    // Prod fallback: export stubs so pages that don't use auth still render
-    app = {} as FirebaseApp;
+    _firebaseConfigured = false;
+    console.error(
+        `[firebase.ts] Firebase is not configured. Missing env var(s): ${missing.join(', ')}.\n` +
+        `Add them to starto-web/.env.local and restart the dev server.\n` +
+        `Copy starto-web/.env.example to get the required keys.`
+    );
+    // Do NOT throw here — throwing at module level causes a white-screen crash.
+    // Auth calls will fail gracefully at runtime and show a user-friendly error
+    // via the firebaseErrorMessage() mapper in auth/page.tsx.
+    app  = {} as FirebaseApp;
     auth = {} as Auth;
 } else {
     app  = getApps().length ? getApp() : initializeApp(firebaseConfig);
     auth = getAuth(app);
 }
+
+/** True if all required Firebase env vars were present at module load time. */
+export const firebaseConfigured = _firebaseConfigured;
 
 export { app, auth };

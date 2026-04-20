@@ -10,7 +10,7 @@ import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/useAuthStore'
 import { useSignalStore } from '@/store/useSignalStore'
 import { usersApi } from '@/lib/apiClient'
-import { auth } from '@/lib/firebase'
+import { auth, firebaseConfigured } from '@/lib/firebase'
 import { 
     createUserWithEmailAndPassword, 
     signInWithEmailAndPassword, 
@@ -273,6 +273,21 @@ export default function AuthPage() {
             >
                 <h1 className="text-4xl font-bold mb-2 tracking-tight">Starto</h1>
                 <p className="text-gray-400 mb-8 text-sm">Where Ecosystems Connect.</p>
+
+                {/* Firebase misconfiguration warning — visible only when env vars are missing */}
+                {!firebaseConfigured && (
+                    <div className="flex items-start gap-2 p-3 bg-red-500/10 border border-red-500/30 rounded-lg mb-6 text-left">
+                        <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
+                        <div>
+                            <p className="text-xs font-semibold text-red-400">Firebase not configured</p>
+                            <p className="text-xs text-red-300/80 mt-0.5">
+                                One or more <code className="bg-red-500/20 px-1 rounded">NEXT_PUBLIC_FIREBASE_*</code> env vars
+                                are missing from <code className="bg-red-500/20 px-1 rounded">.env.local</code>.
+                                Check the browser console for the exact missing key, then restart the dev server.
+                            </p>
+                        </div>
+                    </div>
+                )}
 
                 {/* Tabs */}
                 <div className="flex border-b border-white/10 mb-8">
