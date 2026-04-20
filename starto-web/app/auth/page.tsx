@@ -110,6 +110,53 @@ export default function AuthPage() {
         setForgotSuccess(true)
     }
 
+    // ──────────── FIREBASE ERROR MAPPER ────────────
+    // Maps Firebase Auth error codes to user-friendly messages.
+    // Prevents raw strings like "Firebase: Error (auth/configuration-not-found)"
+    // from being shown to end users.
+    const firebaseErrorMessage = (err: any): string => {
+        const code: string = err?.code ?? ''
+        switch (code) {
+            // Configuration / setup
+            case 'auth/configuration-not-found':
+                return 'Authentication service is not configured. Please contact support.'
+            case 'auth/internal-error':
+                return 'An internal error occurred. Please try again.'
+            // Login errors
+            case 'auth/user-not-found':
+                return 'No account found with this email address.'
+            case 'auth/wrong-password':
+                return 'Incorrect password. Please try again.'
+            case 'auth/invalid-credential':
+                return 'Invalid email or password. Please check your credentials.'
+            case 'auth/user-disabled':
+                return 'This account has been disabled. Please contact support.'
+            case 'auth/too-many-requests':
+                return 'Too many failed attempts. Please wait a few minutes and try again.'
+            // Signup errors
+            case 'auth/email-already-in-use':
+                return 'An account with this email already exists. Try logging in instead.'
+            case 'auth/invalid-email':
+                return 'Please enter a valid email address.'
+            case 'auth/weak-password':
+                return 'Password must be at least 6 characters long.'
+            case 'auth/operation-not-allowed':
+                return 'Email/password sign-in is not enabled. Please contact support.'
+            // Network
+            case 'auth/network-request-failed':
+                return 'Network error. Please check your internet connection and try again.'
+            default:
+                // Fallback: strip the raw Firebase prefix for any unhandled codes
+                if (err?.message) {
+                    return err.message
+                        .replace(/^Firebase:\s*/i, '')
+                        .replace(/\s*\(auth\/[^)]+\)\s*\.?$/, '')
+                        .trim() || 'Something went wrong. Please try again.'
+                }
+                return 'Something went wrong. Please try again.'
+        }
+    }
+
     // ──────────── LOGIN ────────────
 
     // Builds canonical username from name+role: firstname_lastname_role
@@ -164,7 +211,7 @@ export default function AuthPage() {
             setAuth(firebaseUser, token, profile as any)
             router.push('/dashboard')
         } catch (err: any) {
-            setError(err.message || 'Login failed.')
+            setError(firebaseErrorMessage(err))
         } finally {
             setLoading(false)
         }
@@ -211,7 +258,7 @@ export default function AuthPage() {
             setSignupSuccess(true)
             router.push('/dashboard')
         } catch (err: any) {
-            setError(err.message || 'Registration failed.')
+            setError(firebaseErrorMessage(err))
         } finally {
             setLoading(false)
         }
