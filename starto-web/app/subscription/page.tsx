@@ -163,7 +163,7 @@ export default function SubscriptionPage() {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${useAuthStore.getState().token}`
+                    'Authorization': `Bearer ${await (await import('@/lib/apiClient')).getAuthToken()}`
                 },
                 body: JSON.stringify({ plan: planDetails?.id || confirmPlan })
             })

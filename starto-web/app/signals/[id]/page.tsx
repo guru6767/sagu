@@ -35,7 +35,7 @@ import { useResponseStore } from '@/store/useResponseStore'
 export default function SignalDetailPage() {
     const { id } = useParams()
     const router = useRouter()
-    const { user: currentUser, token } = useAuthStore()
+    const { user: currentUser } = useAuthStore()
     const { signals: localSignals, addComment, addReply } = useSignalStore()
     const { sentRequests, pendingRequests, sendRequest, fetchRequests } = useNetworkStore()
     const { addResponse, hasResponded } = useResponseStore()
@@ -343,9 +343,8 @@ export default function SignalDetailPage() {
                                             <button 
                                                 onClick={async () => {
                                                     if (!alreadyConnected && !alreadyPending) {
-                                                        if (!token) { alert('Please login to connect'); return; }
                                                         try {
-                                                            await sendRequest(signal.id, 'I want to connect!', token);
+                                                            await sendRequest(signal.id, 'I want to connect!');
                                                         } catch (err) { /* handled */ }
                                                     }
                                                 }}

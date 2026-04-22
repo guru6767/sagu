@@ -55,7 +55,9 @@ public class AuthController {
                 dto.getRole(),
                 dto.getCity(),
                 dto.getState(),
-                dto.getCountry()
+                dto.getCountry(),
+                dto.getGender(),
+                dto.getBio()
         );
 
         emailService.sendWelcomeEmail(user);

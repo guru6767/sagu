@@ -27,7 +27,7 @@ export default function PublicProfile({ params }: { params: { username: string }
         return lastPart.startsWith('@') ? lastPart : `${prefix}${lastPart}`
     }
 
-    const { user: currentUser, isAuthenticated, token } = useAuthStore()
+    const { user: currentUser, isAuthenticated } = useAuthStore()
     const storeUsername = currentUser?.username || ''
     
     const [fetchedUser, setFetchedUser] = useState<any | null>(null)
@@ -151,16 +151,12 @@ export default function PublicProfile({ params }: { params: { username: string }
                                     <button 
                                         disabled={!isMounted || isPending || userSignals.length === 0}
                                         onClick={async () => {
-                                            if (!token) {
-                                                alert('Please login to connect');
-                                                return;
-                                            }
                                             if (userSignals.length === 0) {
                                                 alert('This user has no active signals to connect to.');
                                                 return;
                                             }
                                             try {
-                                                await sendRequest(userSignals[0].id, 'Hi, I saw your profile and wanted to connect!', token || 'mock-token', paramUsername);
+                                                await sendRequest(userSignals[0].id, 'Hi, I saw your profile and wanted to connect!', paramUsername);
                                                 setRequestJustSent(true);
                                                 // Animation state handles rendering "Sending..." then relies on isPending returning true
                                             } catch (err) {

@@ -35,11 +35,11 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
 
     // 2. Heartbeat every 30 seconds to update presence
     useEffect(() => {
-        if (!isAuthenticated || !token) return
+        if (!isAuthenticated) return
 
         const sendHeartbeat = async () => {
             try {
-                await usersApi.heartbeat(token)
+                await usersApi.heartbeat()
             } catch (error) {
                 console.error('Heartbeat failed', error)
             }
@@ -48,7 +48,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
         sendHeartbeat()
         const interval = setInterval(sendHeartbeat, 30000)
         return () => clearInterval(interval)
-    }, [isAuthenticated, token])
+    }, [isAuthenticated])
 
     return <>{children}</>
 }

@@ -312,8 +312,7 @@ export default function SignalCard({ id, title, username, timeAgo, category, des
                                                 if (!confirm('Permanently delete this signal?')) return;
                                                 
                                                 setIsDeleting(true);
-                                                const authToken = token || (user?.username ? `dev_${user.username}` : '');
-                                                const { error } = await signalsApi.delete(id, authToken);
+                                                const { error } = await signalsApi.delete(id);
                                                 
                                                 if (!error) {
                                                     deleteSignal(id); // remove from local store too
@@ -422,7 +421,7 @@ export default function SignalCard({ id, title, username, timeAgo, category, des
                     onClick={async () => {
                         if (!isOwner && !alreadyConnected && !alreadyPending && !addedToNetwork) {
                             try {
-                                await sendRequest(id, 'I want to connect!', token || 'mock-token', currentSignal?.username);
+                                await sendRequest(id, 'I want to connect!', currentSignal?.username);
                                 setAddedToNetwork(true);
                             } catch (err) {
                                 // Error handled in store

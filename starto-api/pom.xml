@@ -17,7 +17,7 @@
     <description>Starto V2 Platform API</description>
     <properties>
         <!-- Fix #2: align compile target to Java 21 (matches LTS runtime in Dockerfile) -->
-        <java.version>21</java.version>
+        <java.version>17</java.version>
     </properties>
     <dependencies>
         <dependency>
@@ -176,8 +176,8 @@
                 <version>3.13.0</version>
                 <configuration>
                     <!-- Fix #2: match java.version property = 21 -->
-                    <source>21</source>
-                    <target>21</target>
+                    <source>17</source>
+                    <target>17</target>
                     <annotationProcessorPaths>
                         <path>
                             <groupId>org.projectlombok</groupId>

@@ -51,6 +51,18 @@ public class Offer {
     @Column(name = "signal_id", insertable = false, updatable = false)
     private UUID signalId;
 
+    @org.hibernate.annotations.Formula("(SELECT u.username FROM users u WHERE u.id = requester_id)")
+    private String requesterUsername;
+
+    @org.hibernate.annotations.Formula("(SELECT u.username FROM users u WHERE u.id = receiver_id)")
+    private String receiverUsername;
+
+    @org.hibernate.annotations.Formula("(SELECT u.name FROM users u WHERE u.id = requester_id)")
+    private String requesterName;
+
+    @org.hibernate.annotations.Formula("(SELECT u.name FROM users u WHERE u.id = receiver_id)")
+    private String receiverName;
+
     @Column(name = "organization_name")
     private String organizationName;
 

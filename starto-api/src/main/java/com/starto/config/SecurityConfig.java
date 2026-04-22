@@ -34,7 +34,7 @@ public class SecurityConfig {
      * using Google's public keys fetched at startup — no secret to commit.
      * Ensure FIREBASE_SERVICE_ACCOUNT_B64 (not a key literal) is used (see FirebaseConfig).
      */
-    @Value("${security.cors.allowed-origins:http://localhost:3000,http://localhost:8080}")
+    @Value("${security.cors.allowed-origins:http://localhost:3000,http://localhost:8080,http://localhost:8081}")
     private String allowedOriginsRaw;
 
     @Bean

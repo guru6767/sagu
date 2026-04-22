@@ -28,20 +28,24 @@ export default function MySignals() {
     }, [isAuthenticated, router])
 
     const fetchMySignals = useCallback(async () => {
-        if (!user?.username || !token) return
+        if (!user?.username) return
         setLoading(true)
-        const authToken = token.startsWith('local-') ? token.replace('local-', 'dev_') : token
-        const { data } = await signalsApi.getMine(authToken)
-        if (data) setApiSignals(data)
+        const { data } = await signalsApi.getMine()
+        if (data && data.signals) {
+            setApiSignals(data.signals)
+        } else {
+            setApiSignals([])
+        }
         setLoading(false)
-    }, [user?.username, token, refreshKey])
+    }, [user?.username, refreshKey])
 
     useEffect(() => { fetchMySignals() }, [fetchMySignals])
 
     const categories = ['Talent', 'Founder', 'Mentor', 'Instant Help']
 
     // Backend signals for this user
-    const backendIds = new Set(apiSignals.map(s => s.id))
+    const safeApiSignals = Array.isArray(apiSignals) ? apiSignals : []
+    const backendIds = new Set(safeApiSignals.map(s => s.id))
 
     // Local-only signals (not yet in backend) for this user
     const localOnly = localSignals.filter(s =>
@@ -50,7 +54,7 @@ export default function MySignals() {
 
     // Merge and map to unified display shape
     const allMySignals = [
-        ...apiSignals.map(s => ({
+        ...safeApiSignals.map(s => ({
             id: s.id,
             title: s.title,
             category: s.category,
@@ -61,17 +65,6 @@ export default function MySignals() {
             strength: s.signalStrength || '7 Days',
             source: 'backend' as const
         })),
-        ...localOnly.map(s => ({
-            id: s.id,
-            title: s.title,
-            category: s.category,
-            description: s.description,
-            status: s.status,
-            stats: s.stats,
-            createdAt: s.createdAt ? String(s.createdAt) : undefined,
-            strength: s.strength,
-            source: 'local' as const
-        }))
     ].filter(s => {
         const { isExpired } = getSignalExpiration(s)
         return !isExpired && s.status === 'Active' && (activeFilter ? s.category === activeFilter : true)
@@ -81,10 +74,7 @@ export default function MySignals() {
         if (!confirm('Delete this signal?')) return
         setDeletingId(id)
         if (source === 'backend') {
-            const authToken = token?.startsWith('local-')
-                ? token.replace('local-', 'dev_')
-                : (token || (user?.username ? `dev_${user.username}` : ''))
-            const { error } = await signalsApi.delete(id, authToken)
+            const { error } = await signalsApi.delete(id)
             if (!error) {
                 setApiSignals(prev => prev.filter(s => s.id !== id))
             } else {

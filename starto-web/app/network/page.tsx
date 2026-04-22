@@ -22,20 +22,21 @@ export default function NetworkPage() {
     const [search, setSearch] = useState('')
 
     useEffect(() => {
-        if (token) {
-            fetchRequests(token);
+        if (isAuthenticated) {
+            fetchRequests();
             fetchOffers();
         }
-    }, [token, fetchRequests, fetchOffers]);
+    }, [isAuthenticated, fetchRequests, fetchOffers]);
 
     const connectionsArray = Array.isArray(connections) ? connections : []
     const pendingArray = Array.isArray(pendingRequests) ? pendingRequests : []
     const sentArray = Array.isArray(sentRequests) ? sentRequests : []
     const offersArray = Array.isArray(offers) ? offers : []
 
-    const filteredConnections = connectionsArray.filter(c =>
-        c?.username?.toLowerCase().includes(search.toLowerCase())
-    )
+    const filteredConnections = connectionsArray.filter(c => {
+        const otherUsername = c.requesterId === user?.id ? c.receiverName : c.requesterName;
+        return otherUsername?.toLowerCase().includes(search.toLowerCase());
+    })
 
     return (
         <div className="min-h-screen bg-background flex justify-center">
@@ -164,31 +165,31 @@ export default function NetworkPage() {
                                     <AnimatePresence>
                                         {pendingRequests.map(r => (
                                             <motion.div
-                                                key={r.username}
+                                                key={r.id}
                                                 initial={{ opacity: 0, y: 8 }}
                                                 animate={{ opacity: 1, y: 0 }}
                                                 exit={{ opacity: 0, x: 20 }}
                                                 className="flex items-center gap-4 p-4 bg-white border border-border rounded-2xl"
                                             >
-                                                <Link href={`/profile/${r.username}`}>
+                                                <Link href={`/profile/${r.requesterUsername}`}>
                                                     <VerifiedAvatar
-                                                        username={r.username}
-                                                        plan={r.plan}
+                                                        username={r.requesterUsername}
+                                                        avatarUrl={r.requesterAvatarUrl}
                                                         size="w-12 h-12"
                                                         badgeSize="w-4 h-4"
                                                     />
                                                 </Link>
                                                 <div className="flex-1 min-w-0">
-                                                    <Link href={`/profile/${r.username}`} className="font-medium text-sm hover:text-primary">
-                                                        @{r.username}
+                                                    <Link href={`/profile/${r.requesterUsername}`} className="font-medium text-sm hover:text-primary">
+                                                        {r.requesterName} <span className="text-text-muted text-xs font-normal">(@{r.requesterUsername})</span>
                                                     </Link>
-                                                    <p className="text-[10px] text-text-muted uppercase font-bold">{r.category}</p>
+                                                    <p className="text-[10px] text-text-muted uppercase font-bold">{r.requesterRole}</p>
                                                     <p className="text-[10px] text-yellow-600 font-bold mt-0.5">⏳ Pending</p>
                                                 </div>
                                                 <div className="flex gap-2">
                                                     {/* Accept */}
                                                     <button
-                                                        onClick={() => acceptRequest(r.id || r.username, token || 'mock-token')}
+                                                        onClick={() => acceptRequest(r.id)}
                                                         title="Accept connection"
                                                         className="p-2.5 rounded-xl border border-green-300 bg-green-50 text-green-600 hover:bg-green-100 transition-all active:scale-95"
                                                     >
@@ -196,7 +197,7 @@ export default function NetworkPage() {
                                                     </button>
                                                     {/* Reject */}
                                                     <button
-                                                        onClick={() => rejectRequest(r.id || r.username, token || 'mock-token')}
+                                                        onClick={() => rejectRequest(r.id)}
                                                         title="Reject request"
                                                         className="p-2.5 rounded-xl border border-red-200 bg-red-50 text-red-400 hover:bg-red-100 transition-all active:scale-95"
                                                     >
@@ -234,30 +235,28 @@ export default function NetworkPage() {
                                             >
                                                 <div className="flex justify-between items-start">
                                                     <div className="flex items-center gap-3">
-                                                        <Link href={`/profile/${o.fromUsername}`}>
+                                                        <Link href={`/profile/${o.requesterUsername}`}>
                                                             <VerifiedAvatar
-                                                                username={o.fromUsername}
-                                                                plan={o.plan}
+                                                                username={o.requesterUsername}
                                                                 size="w-10 h-10"
                                                                 badgeSize="w-3.5 h-3.5"
                                                             />
                                                         </Link>
                                                         <div>
                                                             <div className="flex items-center gap-2">
-                                                                <Link href={`/profile/${o.fromUsername}`} className="font-medium text-sm hover:text-primary transition-colors hover:underline">
-                                                                    {o.name} <span className="text-text-muted text-xs font-normal">(@{o.fromUsername})</span>
+                                                                <Link href={`/profile/${o.requesterUsername}`} className="font-medium text-sm hover:text-primary transition-colors hover:underline">
+                                                                    {o.requesterName} <span className="text-text-muted text-xs font-normal">(@{o.requesterUsername})</span>
                                                                 </Link>
                                                                 {/* Connect icon */}
-                                                                {connectionsArray.some(c => c.username === o.fromUsername) ? (
+                                                                {connectionsArray.some(c => c.requesterUsername === o.requesterUsername || c.receiverUsername === o.requesterUsername) ? (
                                                                     <span title="Already connected" className="text-green-500"><CheckCheck className="w-4 h-4" /></span>
-                                                                ) : sentArray.some(r => r.username === o.fromUsername && r.status === 'pending') ? (
+                                                                ) : sentArray.some(r => r.receiverUsername === o.requesterUsername && r.status === 'pending') ? (
                                                                     <span title="Request sent" className="text-yellow-500"><CheckCheck className="w-4 h-4" /></span>
                                                                 ) : (
                                                                     <button
                                                                         title="Send connection request"
                                                                         onClick={() => {
-                                                                            // Requires a signalId, so we use the one from the offer
-                                                                            if (token) sendRequest(o.signalId, 'Connecting via offer!', token);
+                                                                            sendRequest(o.signalId, 'Connecting via offer!');
                                                                         }}
                                                                         className="text-text-muted hover:text-primary transition-colors p-0.5 rounded"
                                                                     >
@@ -266,7 +265,7 @@ export default function NetworkPage() {
                                                                 )}
                                                             </div>
                                                             <p className="text-[10px] text-text-muted mt-0.5">
-                                                                {new Date(o.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                                                                {new Date(o.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                                                             </p>
                                                         </div>
                                                     </div>
@@ -275,11 +274,12 @@ export default function NetworkPage() {
                                                     </button>
                                                 </div>
                                                 <div className="pt-3 border-t border-border mt-1">
-                                                    <p className="text-[10px] font-bold uppercase tracking-widest text-text-muted mb-2">Project Link Provided</p>
-                                                    <a href={o.projectLink} target="_blank" rel="noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1.5 font-medium bg-surface-1 hover:bg-surface-2 transition-colors py-2 px-3 rounded-lg border border-border/50 inline-flex max-w-full">
+                                                    <p className="text-[10px] font-bold uppercase tracking-widest text-text-muted mb-2">Portfolio/Project Link</p>
+                                                    <a href={o.portfolioLink} target="_blank" rel="noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1.5 font-medium bg-surface-1 hover:bg-surface-2 transition-colors py-2 px-3 rounded-lg border border-border/50 inline-flex max-w-full">
                                                         <LinkIcon className="w-3.5 h-3.5" />
-                                                        <span className="truncate">{o.projectLink}</span>
+                                                        <span className="truncate">{o.portfolioLink}</span>
                                                     </a>
+                                                    <p className="text-xs text-text-secondary mt-3 leading-relaxed italic">"{o.message}"</p>
                                                 </div>
                                             </motion.div>
                                         ))}

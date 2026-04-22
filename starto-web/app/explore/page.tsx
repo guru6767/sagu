@@ -46,7 +46,7 @@ export default function StartoAIExplore() {
                 budget: parseInt(budget.replace(/[^0-9]/g, '')) || 0,
                 stage: 'Prototype',
                 targetCustomer: 'B2B/B2C'
-            }, token || undefined)
+            })
 
             if (data) {
                 setResults(data)

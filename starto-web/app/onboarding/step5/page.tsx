@@ -19,11 +19,6 @@ export default function OnboardingStep5() {
     const [error, setError] = useState<string | null>(null)
 
     const handleEnterStarto = async () => {
-        if (!token) {
-            setError("Session expired. Please log in again.")
-            return
-        }
-
         setLoading(true)
         setError(null)
         
@@ -37,7 +32,7 @@ export default function OnboardingStep5() {
                 city: onboarding.city,
                 lat: onboarding.lat || undefined,
                 lng: onboarding.lng || undefined
-            }, token)
+            })
 
             if (data) {
                 updateUser(data)

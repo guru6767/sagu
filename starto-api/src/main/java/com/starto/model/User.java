@@ -58,6 +58,9 @@ public class User implements Serializable{
     @Column(length = 100)
     private String industry;
 
+    @Column(length = 10)
+    private String gender;
+
     @Column(name = "sub_industry", length = 100)
     private String subIndustry;
 

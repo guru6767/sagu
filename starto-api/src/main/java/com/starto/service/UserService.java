@@ -77,13 +77,15 @@ public User getUserCached(String firebaseUid) {
 
     @Transactional
 public User createOrUpdateUser(String firebaseUid,
-                                String email,
-                                String name,
-                                String phone,
-                                String role,
-                                String city,
-                                String state,
-                                String country) {
+                                 String email,
+                                 String name,
+                                 String phone,
+                                 String role,
+                                 String city,
+                                 String state,
+                                 String country,
+                                 String gender,
+                                 String bio) {
 
     return userRepository.findByFirebaseUid(firebaseUid)
             .map(user -> {
@@ -96,6 +98,8 @@ public User createOrUpdateUser(String firebaseUid,
                 if (user.getState() == null) user.setState(state);
                 if (user.getCountry() == null) user.setCountry(country != null ? country : "India");
                 if (user.getPhone() == null) user.setPhone(phone);
+                if (user.getGender() == null) user.setGender(gender);
+                if (user.getBio() == null) user.setBio(bio);
 
                 return userRepository.save(user);
             })
@@ -112,6 +116,8 @@ public User createOrUpdateUser(String firebaseUid,
                         .city(city)
                         .state(state)
                         .country(country != null ? country : "India")
+                        .gender(gender)
+                        .bio(bio)
                         .username(finalUsername)
                         .plan(Plan.EXPLORER)
                         .isOnline(true)
@@ -139,6 +145,7 @@ if (user.getGithubUrl() != null) existing.setGithubUrl(user.getGithubUrl());
 if (user.getLat() != null) existing.setLat(user.getLat());
 if (user.getLng() != null) existing.setLng(user.getLng());
 if (user.getIndustry() != null) existing.setIndustry(user.getIndustry());
+if (user.getGender() != null) existing.setGender(user.getGender());
 
     existing.setUpdatedAt(OffsetDateTime.now());
 

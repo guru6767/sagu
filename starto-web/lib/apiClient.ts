@@ -1,3 +1,6 @@
+import { getAuth } from "firebase/auth";
+
+
 /**
  * Starto API Client
  * Centralized HTTP client for all backend calls.
@@ -15,26 +18,97 @@ const BASE_URL =
         ? ''  // CSR dev: relative URL → proxied by Next.js → backend (no CORS)
         : (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080');
 
+/**
+ * Custom fetch wrapper with automatic Firebase Auth header injection.
+ */
+export async function apiFetch<T>(
+    endpoint: string,
+    options: RequestInit = {},
+    overrideToken?: string
+): Promise<{ data: T | null; error: string | null; status: number }> {
+    try {
+        const headers = new Headers(options.headers || {});
+        if (!headers.has('Content-Type')) {
+            headers.set('Content-Type', 'application/json');
+        }
 
-// ─── Types matching the Spring Boot backend models ───────────────────────────
+        // Auto-inject Firebase ID Token if user is logged in
+        let token = overrideToken;
+        if (!token && typeof window !== 'undefined') {
+            const auth = getAuth();
+            if (auth.currentUser) {
+                token = await auth.currentUser.getIdToken();
+            }
+        }
+
+        if (token) {
+            headers.set('Authorization', `Bearer ${token}`);
+        }
+
+        const url = `${BASE_URL}${endpoint}`;
+        console.log(`[apiFetch] Calling: ${url}`, options);
+
+        const response = await fetch(url, {
+            ...options,
+            headers,
+        });
+
+        const status = response.status;
+        
+        // Handle 204 No Content
+        if (status === 204) {
+            return { data: null, error: null, status };
+        }
+
+        const text = await response.text();
+        let data: any = null;
+        try {
+            data = text ? JSON.parse(text) : null;
+        } catch (e) {
+            data = text;
+        }
+
+        if (!response.ok) {
+            return {
+                data: null,
+                error: typeof data === 'object' ? (data.error || data.message || response.statusText) : (data || response.statusText),
+                status
+            };
+        }
+
+        return { data: data as T, error: null, status };
+    } catch (err: any) {
+        console.error(`API Fetch Error [${endpoint}]:`, err);
+        return { data: null, error: err.message || 'Network request failed', status: 0 };
+    }
+}
+
+// ─── Data Interfaces ─────────────────────────────────────────────────────────
 
 export interface ApiSignal {
-    id: string;           // UUID
+    id: string;
+    type: 'need' | 'help';
     title: string;
     description: string;
     category: string;
-    type: string;         // "need" | "help"
     seeking: string;
-    status: string;       // "open" | "closed"
-    username: string;
+    stage: string;
     city: string;
+    state: string;
+    lat: number | null;
+    lng: number | null;
+    timelineDays: number;
+    compensation: string;
+    visibility: string;
     signalStrength: string;
     viewCount: number;
     responseCount: number;
     offerCount: number;
+    isBoosted: boolean;
     createdAt: string;    // ISO datetime
     expiresAt: string;
     userId: string;
+    username?: string;
     userPlan?: string;
 }
 
@@ -44,22 +118,25 @@ export interface ApiUser {
     email: string;
     name: string;
     username: string;
+    phone: string;
     role: string;
     bio: string | null;
+    gender: string | null;
+    avatarUrl: string | null;
     city: string | null;
     state: string | null;
+    country: string;
     industry: string | null;
+    subIndustry: string | null;
     websiteUrl: string | null;
     linkedinUrl: string | null;
     twitterUrl: string | null;
     githubUrl: string | null;
-    plan: string;
-    isOnline: boolean;
-    lastSeen: string;
     lat: number | null;
     lng: number | null;
-    signalCount?: number;
-    networkSize?: number;
+    fcmToken?: string | null;
+    plan: string;
+    planExpiresAt?: string | null;
 }
 
 export interface ApiComment {
@@ -100,119 +177,88 @@ export interface ApiExploreResponse {
     budgetFeasibility: {
         canBuild: string[];
         actualNeed: string[];
-        verdict: string;
     };
-    governmentSchemes: {
-        name: string;
-        body: string;
-        benefits: string[];
-        eligibility: string;
-        applyUrl: string;
-    }[];
-    actionPlan: {
-        range: string;
-        tasks: string[];
-    }[];
-    confidenceScore: number;
 }
 
 export interface CreateSignalPayload {
+    type: 'need' | 'help';
     title: string;
     description: string;
     category: string;
-    type: string;
     seeking: string;
-    city?: string;
-    timelineDays?: number;
-    signalStrength?: string;
-}
-
-// ─── Core fetch helper ───────────────────────────────────────────────────────
-
-async function apiFetch<T>(
-    path: string,
-    options: RequestInit = {},
-    token?: string | null
-): Promise<{ data: T | null; error: string | null; status: number }> {
-    const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        ...(options.headers as Record<string, string> || {}),
-    };
-
-    if (token) {
-        const finalToken = token.startsWith('local-') ? token.replace('local-', 'dev_') : token;
-        headers['Authorization'] = `Bearer ${finalToken}`;
-    }
-
-    try {
-        const res = await fetch(`${BASE_URL}${path}`, {
-            cache: 'no-store',
-            ...options,
-            headers,
-        });
-
-        if (res.status === 204) {
-            return { data: null, error: null, status: 204 };
-        }
-
-        const text = await res.text();
-        let data: T | null = null;
-        try {
-            data = text ? JSON.parse(text) : null;
-        } catch {
-            data = text as unknown as T;
-        }
-
-        if (!res.ok) {
-            const errMsg = (data as any)?.error || (data as any)?.message || `HTTP ${res.status}`;
-            return { data: null, error: errMsg, status: res.status };
-        }
-
-        return { data, error: null, status: res.status };
-    } catch (err: any) {
-        return { data: null, error: err.message || 'Network error', status: 0 };
-    }
+    stage: string;
+    city: string;
+    state: string;
+    lat?: number;
+    lng?: number;
+    timelineDays: number;
+    signalStrength: string;
 }
 
 // ─── Signal API ──────────────────────────────────────────────────────────────
 
 export const signalsApi = {
-    /** GET /api/signals — public, no auth required */
-    getAll: (params?: { city?: string; seeking?: string; username?: string }) => {
+    /** GET /api/signals — public */
+    getAll: (params?: { city?: string; seeking?: string; username?: string; page?: number }) => {
         const qs = params
             ? '?' + Object.entries(params)
                 .filter(([, v]) => v != null)
                 .map(([k, v]) => `${k}=${encodeURIComponent(v!)}`)
                 .join('&')
             : '';
-        return apiFetch<ApiSignal[]>(`/api/signals${qs}`);
+        return apiFetch<ApiSignal[] | { content: ApiSignal[] }>(`/api/signals${qs}`).then(res => {
+            console.log('signalsApi.getAll response:', res);
+            if (res.data && typeof res.data === 'object' && !Array.isArray(res.data) && 'content' in res.data) {
+                return { ...res, data: (res.data as any).content as ApiSignal[] };
+            }
+            return res as { data: ApiSignal[] | null; error: string | null; status: number };
+        });
     },
 
-    /** GET /api/signals/mine — requires auth */
-    getMine: (token: string) =>
-        apiFetch<ApiSignal[]>('/api/signals/mine', {}, token),
+    /** GET /api/signals/my — requires auth */
+    getMine: (category?: string) =>
+        apiFetch<{ signals: ApiSignal[]; spaces: any[] }>(`/api/signals/my${category ? `?category=${category}` : ''}`),
 
     /** GET /api/signals/:id — public */
     getById: (id: string) =>
         apiFetch<ApiSignal>(`/api/signals/${id}`),
 
     /** POST /api/signals — requires Firebase auth token */
-    create: (payload: CreateSignalPayload, token: string) =>
+    create: (payload: CreateSignalPayload) =>
         apiFetch<ApiSignal>('/api/signals', {
             method: 'POST',
             body: JSON.stringify(payload),
-        }, token),
+        }),
 
     /** DELETE /api/signals/:id — requires auth */
-    delete: (id: string, token: string) =>
-        apiFetch<void>(`/api/signals/${id}`, { method: 'DELETE' }, token),
+    delete: (id: string) =>
+        apiFetch<void>(`/api/signals/${id}`, { method: 'DELETE' }),
 
     /** PUT /api/signals/:id — requires auth */
-    update: (id: string, payload: Partial<CreateSignalPayload>, token: string) =>
+    update: (id: string, payload: Partial<CreateSignalPayload>) =>
         apiFetch<ApiSignal>(`/api/signals/${id}`, {
             method: 'PUT',
             body: JSON.stringify(payload),
-        }, token),
+        }),
+
+    /** GET /api/signals/:id/insights — owner only */
+    getInsights: (id: string) =>
+        apiFetch<any>(`/api/signals/${id}/insights`),
+
+    /** GET /api/signals/nearby — public */
+    getNearby: (lat: number, lng: number, radiusKm: number = 10) =>
+        apiFetch<any>(`/api/signals/nearby?lat=${lat}&lng=${lng}&radiusKm=${radiusKm}`),
+
+    /** GET /api/signals/spaces — public */
+    getSpaces: (lat: number, lng: number, radiusKm: number = 10) =>
+        apiFetch<any[]>(`/api/signals/spaces?lat=${lat}&lng=${lng}&radiusKm=${radiusKm}`),
+
+    /** POST /api/signals/spaces — requires auth */
+    createSpace: (payload: any) =>
+        apiFetch<any>('/api/signals/spaces', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        }),
 };
 
 // ─── User API ────────────────────────────────────────────────────────────────
@@ -223,35 +269,38 @@ export const usersApi = {
         apiFetch<ApiUser>(`/api/users/${username}`),
 
     /** GET /api/auth/me — requires auth */
-    getMe: (token: string) =>
-        apiFetch<ApiUser>('/api/auth/me', {}, token),
+    getMe: (overrideToken?: string) =>
+        apiFetch<ApiUser>('/api/auth/me', {}, overrideToken),
 
     /** POST /api/auth/register — requires auth (Firebase token in header) */
-    register: (payload: Partial<ApiUser>, token: string) =>
+    register: (payload: Partial<ApiUser>, overrideToken?: string) =>
         apiFetch<ApiUser>('/api/auth/register', {
             method: 'POST',
             body: JSON.stringify(payload),
-        }, token),
+        }, overrideToken),
 
     /** PUT /api/users/profile — requires auth */
-    updateProfile: (payload: Partial<ApiUser>, token: string) =>
+    updateProfile: (payload: Partial<ApiUser>) =>
         apiFetch<ApiUser>('/api/users/profile', {
             method: 'PUT',
             body: JSON.stringify(payload),
-        }, token),
-    
-    /** POST /api/users/heartbeat — requires auth */
-    heartbeat: (token: string) =>
-        apiFetch<void>('/api/users/heartbeat', { method: 'POST' }, token),
+        }),
 
-    /** GET /api/users/nearby — requires auth */
-    getNearby: (params: { role?: string; lat: number; lng: number; radius?: number }, token: string) => {
-        const qs = '?' + Object.entries(params)
-            .filter(([, v]) => v != null)
-            .map(([k, v]) => `${k}=${v}`)
-            .join('&');
-        return apiFetch<ApiUser[]>(`/api/users/nearby${qs}`, {}, token);
-    },
+    /** POST /api/users/heartbeat — requires auth */
+    heartbeat: () =>
+        apiFetch<void>('/api/users/heartbeat', { method: 'POST' }),
+
+    /** POST /api/users/logout — requires auth */
+    logout: () =>
+        apiFetch<void>('/api/users/logout', { method: 'POST' }),
+
+    /** GET /api/users/check-username — public */
+    checkUsername: (username: string, role: string) =>
+        apiFetch<{ available: boolean; username: string; message?: string }>(`/api/users/check-username?username=${username}&role=${role}`),
+
+    /** GET /api/users/plan-status — requires auth */
+    getPlanStatus: () =>
+        apiFetch<any>('/api/users/plan-status'),
 };
 
 // ─── Comment API ─────────────────────────────────────────────────────────────
@@ -262,69 +311,154 @@ export const commentsApi = {
         apiFetch<ApiComment[]>(`/api/signals/${signalId}/comments`),
 
     /** POST /api/signals/:signalId/comments — requires auth */
-    post: (signalId: string, content: string, token: string) =>
+    post: (signalId: string, content: string) =>
         apiFetch<ApiComment>(`/api/signals/${signalId}/comments`, {
             method: 'POST',
             body: JSON.stringify({ content }),
-        }, token),
+        }),
+
+    /** POST /api/signals/:signalId/comments/:parentId/reply — requires auth */
+    postReply: (signalId: string, parentId: string, content: string) =>
+        apiFetch<ApiComment>(`/api/signals/${signalId}/comments/${parentId}/reply`, {
+            method: 'POST',
+            body: JSON.stringify({ content }),
+        }),
+
+    /** DELETE /api/signals/:signalId/comments/:commentId — requires auth */
+    delete: (signalId: string, commentId: string) =>
+        apiFetch<void>(`/api/signals/${signalId}/comments/${commentId}`, { method: 'DELETE' }),
 };
 
 // ─── Connection API ──────────────────────────────────────────────────────────
 export const connectionsApi = {
     /** POST /api/connections/request */
-    sendRequest: (signalId: string | null, message: string, token: string, targetUsername?: string) =>
+    sendRequest: (signalId: string | null, message: string, receiverId: string) =>
         apiFetch<any>('/api/connections/request', {
             method: 'POST',
-            body: JSON.stringify({ signalId, message, targetUsername }),
-        }, token),
+            body: JSON.stringify({ signalId, message, receiverId }),
+        }),
 
     /** GET /api/connections/pending — incoming for founder */
-    getPending: (token: string) =>
-        apiFetch<any[]>('/api/connections/pending', {}, token),
+    getPending: () =>
+        apiFetch<any[]>('/api/connections/pending'),
 
     /** GET /api/connections/sent — outgoing for talent */
-    getSent: (token: string) =>
-        apiFetch<any[]>('/api/connections/sent', {}, token),
+    getSent: () =>
+        apiFetch<any[]>('/api/connections/sent'),
 
     /** GET /api/connections/accepted */
-    getAccepted: (token: string) =>
-        apiFetch<any[]>('/api/connections/accepted', {}, token),
+    getAccepted: () =>
+        apiFetch<any[]>('/api/connections/accepted'),
 
     /** PUT /api/connections/:id/accept */
-    accept: (id: string, token: string) =>
-        apiFetch<any>(`/api/connections/${id}/accept`, { method: 'PUT' }, token),
+    accept: (id: string) =>
+        apiFetch<any>(`/api/connections/${id}/accept`, { method: 'PUT' }),
 
     /** PUT /api/connections/:id/reject */
-    reject: (id: string, token: string) =>
-        apiFetch<any>(`/api/connections/${id}/reject`, { method: 'PUT' }, token),
+    reject: (id: string) =>
+        apiFetch<any>(`/api/connections/${id}/reject`, { method: 'PUT' }),
+
+    /** GET /api/connections/:id/whatsapp */
+    getWhatsappLink: (id: string) =>
+        apiFetch<{ whatsappUrl: string }>(`/api/connections/${id}/whatsapp`),
 };
 
 // ─── Offer API ───────────────────────────────────────────────────────────────
 export const offersApi = {
-    create: (payload: { signalId: string; organizationName: string; portfolioLink: string; message: string }, token: string) =>
+    /** POST /api/offers/request */
+    create: (payload: { signalId: string; organizationName: string; portfolioLink: string; message: string }) =>
         apiFetch<any>('/api/offers/request', {
             method: 'POST',
             body: JSON.stringify(payload),
-        }, token),
+        }),
 
-    getInbox: (token: string) =>
-        apiFetch<any[]>('/api/offers/inbox', {}, token),
+    /** GET /api/offers/inbox */
+    getInbox: () =>
+        apiFetch<any[]>('/api/offers/inbox'),
 
-    getSent: (token: string) =>
-        apiFetch<any[]>('/api/offers/sent', {}, token),
+    /** GET /api/offers/sent */
+    getSent: () =>
+        apiFetch<any[]>('/api/offers/sent'),
 
-    getWhatsappLink: (id: string, token: string) =>
-        apiFetch<{ link: string }>(`/api/offers/${id}/whatsapp`, {}, token),
+    /** GET /api/offers/:id/whatsapp */
+    getWhatsappLink: (id: string) =>
+        apiFetch<{ whatsappUrl: string }>(`/api/offers/${id}/whatsapp`),
+};
+
+// ─── Notification API ────────────────────────────────────────────────────────
+export const notificationsApi = {
+    /** GET /api/notifications */
+    getAll: () =>
+        apiFetch<any[]>('/api/notifications'),
+
+    /** PUT /api/notifications/:id/read */
+    markAsRead: (id: string) =>
+        apiFetch<void>(`/api/notifications/${id}/read`, { method: 'PUT' }),
+
+    /** PUT /api/notifications/read-all */
+    markAllAsRead: () =>
+        apiFetch<void>('/api/notifications/read-all', { method: 'PUT' }),
+
+    /** GET /api/notifications/unread-count */
+    getUnreadCount: () =>
+        apiFetch<{ count: number }>('/api/notifications/unread-count'),
+};
+
+// ─── Subscription API ────────────────────────────────────────────────────────
+export const subscriptionsApi = {
+    /** GET /api/subscriptions/plans */
+    getPlans: () =>
+        apiFetch<any[]>('/api/subscriptions/plans'),
+
+    /** GET /api/subscriptions/status */
+    getStatus: () =>
+        apiFetch<any>('/api/subscriptions/status'),
+
+    /** POST /api/subscriptions/create-order */
+    createOrder: (plan: string) =>
+        apiFetch<any>('/api/subscriptions/create-order', {
+            method: 'POST',
+            body: JSON.stringify({ plan }),
+        }),
+
+    /** POST /api/subscriptions/verify */
+    verify: (payload: { razorpayOrderId?: string; razorpaySubscriptionId?: string; razorpayPaymentId: string; razorpaySignature: string }) =>
+        apiFetch<any>('/api/subscriptions/verify', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        }),
+
+    /** GET /api/subscriptions/history */
+    getHistory: () =>
+        apiFetch<any[]>('/api/subscriptions/history'),
+
+    /** POST /api/subscriptions/upgrade */
+    upgrade: (plan: string) =>
+        apiFetch<any>('/api/subscriptions/upgrade', {
+            method: 'POST',
+            body: JSON.stringify({ plan }),
+        }),
 };
 
 // ─── Explore API ─────────────────────────────────────────────────────────────
 export const exploreApi = {
     /** POST /api/explore/analyze */
-    analyze: (payload: ApiExploreRequest, token?: string) =>
+    analyze: (payload: ApiExploreRequest) =>
         apiFetch<ApiExploreResponse>('/api/explore/analyze', {
             method: 'POST',
             body: JSON.stringify(payload),
-        }, token),
+        }),
 };
 
-export default apiFetch;
+// ─── Search API ──────────────────────────────────────────────────────────────
+export const searchApi = {
+    /** GET /api/search?q=query */
+    search: (query: string) =>
+        apiFetch<any>(`/api/search?q=${encodeURIComponent(query)}`),
+};
+
+export async function getAuthToken(): Promise<string | null> {
+  const user = getAuth().currentUser;
+  if (!user) return null;
+  return await user.getIdToken();
+}

@@ -14,8 +14,16 @@ import { useSearchStore } from '@/store/useSearchStore'
 import { signalsApi, ApiSignal } from '@/lib/apiClient'
 import SearchResultsPanel from '@/components/feed/SearchResultsPanel'
 
-function formatInstagramTime(createdAt?: string) {
-    const createdMs = createdAt ? new Date(createdAt).getTime() : 0;
+function formatInstagramTime(createdAt?: any) {
+    let createdMs = 0;
+    if (createdAt) {
+        if (typeof createdAt === 'number') {
+            // Convert seconds to ms if needed
+            createdMs = createdAt < 10000000000 ? createdAt * 1000 : createdAt;
+        } else {
+            createdMs = new Date(createdAt).getTime();
+        }
+    }
     if (!createdMs) return 'now';
     const diffMs = Math.max(0, Date.now() - createdMs);
     const diffSec = Math.floor(diffMs / 1000);
@@ -88,7 +96,7 @@ export default function HomeFeed() {
             if (error || data === null) {
                 setBackendError(error || 'Could not reach backend')
             } else {
-                setApiSignals(data)
+                setApiSignals(Array.isArray(data) ? data : [])
             }
             setLoading(false)
         })
@@ -105,26 +113,12 @@ export default function HomeFeed() {
     }
 
     // Merge backend signals + any local-only signals (created while offline)
-    const backendIds = new Set(apiSignals.map(s => s.id))
+    const safeApiSignals = Array.isArray(apiSignals) ? apiSignals : []
+    const backendIds = new Set(safeApiSignals.map(s => s.id))
     const localOnly = localSignals.filter(s => !backendIds.has(s.id))
-
+    
     const displaySignals = [
-        ...apiSignals.map(mapApiSignalToCard),
-        ...localOnly.map(s => ({
-            id: s.id,
-            title: s.title,
-            username: s.username,
-            timeAgo: s.timeAgo,
-            category: s.category,
-            description: s.description,
-            strength: s.strength,
-            stats: s.stats,
-            // Use the plan stored on the signal; if it's the current user's signal, use their live plan
-            userPlan: s.username === user?.username
-                ? (user?.subscription || user?.plan || s.userPlan || 'Free')
-                : (s.userPlan || 'Free'),
-            createdAt: s.createdAt
-        })),
+        ...safeApiSignals.map(mapApiSignalToCard),
     ].filter(s => {
         const { isExpired } = getSignalExpiration(s);
         return !isExpired;
@@ -140,7 +134,7 @@ export default function HomeFeed() {
                     <header className="mb-8 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-background/90 backdrop-blur-md sticky top-0 z-20 py-4 -mx-4 px-4 border-b border-border shadow-sm">
                         <div className="flex items-center gap-4">
                             <h1 className="text-2xl font-bold font-display tracking-tight text-black">Signals Feed</h1>
-                            
+
                             {/* Backend status and local mode notice moved into header for compactness */}
                             {!loading && backendError && (
                                 <span className="flex items-center gap-1 text-[9px] font-extrabold uppercase tracking-tighter text-orange-600 border border-orange-200 bg-orange-50/80 px-2 py-0.5 rounded-full whitespace-nowrap">
@@ -148,12 +142,12 @@ export default function HomeFeed() {
                                 </span>
                             )}
                         </div>
-                        
+
                         <div className="flex gap-2 items-center w-full sm:flex-1 justify-end sm:max-w-md sm:ml-4">
                             <div className="relative group flex-1">
                                 <div className="relative">
                                     <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors ${query ? 'text-primary' : 'text-text-muted'}`} />
-                                    <input 
+                                    <input
                                         type="text"
                                         placeholder="Search signals..."
                                         value={query}
@@ -161,7 +155,7 @@ export default function HomeFeed() {
                                         className="pl-9 pr-4 py-2 bg-white/50 border border-border rounded-full text-sm focus:outline-none focus:border-primary/40 focus:ring-4 focus:ring-primary/5 w-full transition-all"
                                     />
                                     {query && (
-                                        <button 
+                                        <button
                                             onClick={clearSearch}
                                             className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-border/50 rounded-full"
                                         >
@@ -194,7 +188,7 @@ export default function HomeFeed() {
                             <WifiOff className="w-4 h-4 shrink-0 mt-0.5" />
                             <span>
                                 <strong>Backend unreachable:</strong> {backendError}. Showing local signals only.
-                                Make sure the Spring Boot server is running at <code className="font-mono bg-orange-100 px-1 rounded">localhost:8080</code>.
+                                Make sure the Spring Boot server is running at <code className="font-mono bg-orange-100 px-1 rounded">localhost:9090</code>.
                             </span>
                         </div>
                     )}
@@ -259,14 +253,14 @@ export default function HomeFeed() {
                         </button>
                     </div>
                 </aside>
-                
-                <RaiseSignalModal 
-                    isOpen={isRaiseModalOpen} 
+
+                <RaiseSignalModal
+                    isOpen={isRaiseModalOpen}
                     onClose={() => {
                         setIsRaiseModalOpen(false)
                         // Refresh feed after signal creation attempt
                         setRefreshKey(k => k + 1)
-                    }} 
+                    }}
                 />
                 <MobileBottomNav />
             </div>

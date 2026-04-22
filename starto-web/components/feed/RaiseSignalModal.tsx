@@ -49,6 +49,21 @@ export default function RaiseSignalModal({ isOpen, onClose, editSignal }: RaiseS
 
     const handleBroadcast = async () => {
         if (!headline || !details || duration === 0) return;
+
+        // Backend constraints validation
+        if (headline.length < 5) {
+            setToast({ type: 'warn', msg: 'Title must be at least 5 characters long.' });
+            return;
+        }
+        if (headline.length > 200) {
+            setToast({ type: 'warn', msg: 'Title must be less than 200 characters.' });
+            return;
+        }
+        if (details.length < 10) {
+            setToast({ type: 'warn', msg: 'Description must be at least 10 characters long.' });
+            return;
+        }
+
         if (duration > 7) {
             onClose();
             router.push('/subscription');
@@ -61,9 +76,6 @@ export default function RaiseSignalModal({ isOpen, onClose, editSignal }: RaiseS
         const currentUsername = user?.username || 'user';
 
         if (editSignal) {
-            // Edit mode: try to update backend first
-            const authToken = token || (user?.username ? `dev_${user.username}` : '');
-            
             const { error } = await signalsApi.update(
                 editSignal.id,
                 {
@@ -74,8 +86,7 @@ export default function RaiseSignalModal({ isOpen, onClose, editSignal }: RaiseS
                     seeking: category,
                     timelineDays: duration,
                     signalStrength: `${duration} Days`,
-                },
-                authToken
+                }
             );
 
             if (!error) {
@@ -105,10 +116,6 @@ export default function RaiseSignalModal({ isOpen, onClose, editSignal }: RaiseS
             return;
         }
 
-        // ── Try to post to backend first ─────────────────────────────────────
-        // If we don't have a real token but have a local user, use the dev_token fallback
-        const authToken = token || (user?.username ? `dev_${user.username}` : '');
-
         const { data, error, status } = await signalsApi.create(
             {
                 title: headline,
@@ -116,11 +123,12 @@ export default function RaiseSignalModal({ isOpen, onClose, editSignal }: RaiseS
                 category,
                 type: signalType,
                 seeking: category,
-                city: user?.city || '',
+                stage: 'Early Stage', // Default required field
+                city: user?.city || 'Local',
+                state: user?.state || 'Local', // Required field
                 timelineDays: duration,
                 signalStrength: `${duration} Days`,
-            },
-            authToken
+            }
         );
 
         if (data && !error) {

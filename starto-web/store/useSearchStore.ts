@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import apiFetch from '@/lib/apiClient'
+import { apiFetch } from '@/lib/apiClient'
 import { useAuthStore } from './useAuthStore'
 import { useSignalStore } from './useSignalStore'
 
@@ -72,8 +72,7 @@ export const useSearchStore = create<SearchState>((set) => ({
         }));
 
         // 2. Search Backend
-        const token = useAuthStore.getState().token;
-        const { data, error } = await apiFetch<SearchResponse>(`/api/search?q=${encodeURIComponent(trimmedQuery)}`, {}, token);
+        const { data, error } = await apiFetch<SearchResponse>(`/api/search?q=${encodeURIComponent(trimmedQuery)}`);
         
         // Helper to keep only one signal per user (latest is first)
         const deduplicateByUser = (sigs: SearchResultSignal[]) => {

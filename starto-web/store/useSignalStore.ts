@@ -115,7 +115,15 @@ export function getSignalExpiration(signal: any) {
     const strengthStr = signal.strength || signal.signalStrength || '7';
     const totalDuration = parseInt(strengthStr) || 7;
     // Default to 1 day ago if no createdAt is provided for legacy
-    const safeCreatedAt = signal.createdAt ? new Date(signal.createdAt).getTime() : (Date.now() - (1000 * 60 * 60 * 24));
+    let safeCreatedAt: number;
+    if (signal.createdAt) {
+        const val = typeof signal.createdAt === 'number' ? signal.createdAt : new Date(signal.createdAt).getTime();
+        // Backend often sends seconds (e.g. 1776483984) instead of ms
+        // If it's less than 10,000,000,000, it's almost certainly seconds
+        safeCreatedAt = val < 10000000000 ? val * 1000 : val;
+    } else {
+        safeCreatedAt = Date.now() - (1000 * 60 * 60 * 24);
+    }
     
     // Calculate hours strictly using time difference
     const msElapsed = Date.now() - safeCreatedAt;

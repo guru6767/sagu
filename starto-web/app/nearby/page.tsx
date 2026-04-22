@@ -30,7 +30,7 @@ export default function NearbyEcosystem() {
     ]
 
     const fetchNearby = useCallback(async () => {
-        if (!token || !searchLat || !searchLng) {
+        if (!searchLat || !searchLng) {
             setLoading(false)
             return
         }
@@ -41,13 +41,13 @@ export default function NearbyEcosystem() {
             lng: searchLng,
             role: searchRole || undefined,
             radius: radius
-        }, token)
+        })
 
         if (data) {
             setNearbyUsers(data)
         }
         setLoading(false)
-    }, [token, searchLat, searchLng, searchRole, radius])
+    }, [searchLat, searchLng, searchRole, radius])
 
     // Initial load from user profile
     useEffect(() => {

@@ -1,0 +1,6 @@
+-- Seed fake signals for testing
+INSERT INTO signals (id, user_id, type, title, description, stage, city, state, category, seeking, visibility, status, signal_strength, response_count, offer_count, view_count, is_boosted, created_at, expires_at)
+VALUES 
+(gen_random_uuid(), (SELECT id FROM users LIMIT 1), 'need', 'Seed Signal 1: Looking for Co-founder', 'We are building a fintech app for rural India and need a tech co-founder with experience in Spring Boot.', 'MVP', 'Bangalore', 'Karnataka', 'Fintech', 'Co-founder', 'global', 'open', 'normal', 0, 0, 0, false, now(), now() + interval '7 days'),
+(gen_random_uuid(), (SELECT id FROM users LIMIT 1), 'help', 'Seed Signal 2: Offering Mentorship', 'I have 10 years of experience in product management. Happy to help early-stage founders with roadmap planning.', 'Growth', 'Mumbai', 'Maharashtra', 'Product', 'Mentorship', 'global', 'open', 'normal', 0, 0, 0, false, now(), now() + interval '7 days'),
+(gen_random_uuid(), (SELECT id FROM users LIMIT 1), 'need', 'Seed Signal 3: Raising Seed Round', 'Edtech startup looking to raise $500k for expansion into SE Asia.', 'Early Stage', 'Delhi', 'Delhi', 'Edtech', 'Funding', 'global', 'open', 'normal', 0, 0, 0, false, now(), now() + interval '7 days');

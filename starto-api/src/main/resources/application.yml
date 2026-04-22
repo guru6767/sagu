@@ -2,93 +2,41 @@ spring:
   application:
     name: starto-api
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/starto}
-    username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:password}
+    url: jdbc:postgresql://localhost:5432/starto
+    username: postgres
+    password: admin
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
-      # PROD: use 'validate' — schema is managed by schema.sql / Flyway, not Hibernate DDL.
-      # LOCAL: set env var SPRING_JPA_HIBERNATE_DDL_AUTO=update to allow auto-creation during dev.
-      ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:validate}
-    show-sql: false
+      ddl-auto: update
+    show-sql: true
     open-in-view: false
     properties:
       hibernate:
-  data:
-    redis:
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:}
+        dialect: org.hibernate.dialect.PostgreSQLDialect   
+
   mail:
-    host: ${MAIL_HOST:smtp.gmail.com}
-    port: ${MAIL_PORT:587}
-    username: ${MAIL_USERNAME:}
-    password: ${MAIL_PASSWORD:}
+    host: smtp.gmail.com
+    port: 587
+    username: sagarghate164@gmail.com
+    password: {password}
     properties:
       mail:
         smtp:
           auth: true
           starttls:
             enable: true
+          ssl:
+            trust: smtp.gmail.com
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+    
 
 logging:
   level:
-    org.springframework.transaction: WARN
-    org.hibernate.SQL: WARN
-    root: INFO
+    org.springframework.transaction: DEBUG
+    org.hibernate.SQL: DEBUG
 
 server:
-  # Fix #1: canonical port is 8080. Set PORT env var to override (e.g. PORT=8081 for local legacy).
-  port: ${PORT:8080}
-
-# Fix #1: Auth strategy is Firebase ID tokens verified by Admin SDK using Google's
-# public keys — there is NO local JWT secret to store. Protect FIREBASE_SERVICE_ACCOUNT_B64
-# (see FirebaseConfig) and never commit firebase-service-account.json.
-#
-# Fix #2: CORS allowed origins loaded from env var — comma-separated list.
-# Prod: ALLOWED_ORIGINS=https://starto.in,https://app.starto.in
-# Local: leave unset (defaults to localhost:3000 and localhost:8080 in SecurityConfig)
-security:
-  cors:
-    allowed-origins: ${ALLOWED_ORIGINS:http://localhost:3000,http://localhost:8080}
-
-openai:
-  api-key: ${OPENAI_API_KEY:dummy_key}
-
-google:
-  ai:
-    api-key: ${GEMINI_API_KEY:}
-  maps:
-    api-key: ${GOOGLE_MAPS_API_KEY:}
-
-firebase:
-  # Fix #6: prefer base64 inline JSON via FIREBASE_SERVICE_ACCOUNT_B64 env var.
-  # Fallback to file path for local dev only.
-  # Alias: firebase.config-base64 accepted as alternative to service-account-b64.
-  service-account-b64: ${FIREBASE_SERVICE_ACCOUNT_B64:}
-  config-base64: ${FIREBASE_CONFIG_BASE64:${FIREBASE_SERVICE_ACCOUNT_B64:}}
-  config-path: ${FIREBASE_CONFIG_PATH:src/main/resources/firebase-service-account.json}
-
-razorpay:
-  key:
-    id: ${RAZORPAY_KEY_ID:}
-    secret: ${RAZORPAY_KEY_SECRET:}
-  plans:
-    sprint: ${RAZORPAY_PLAN_SPRINT:plan_Sf2GSCBf5wTrzk}
-    boost: ${RAZORPAY_PLAN_BOOST:plan_Sf2GSCBf5wTrzk}
-    pro: ${RAZORPAY_PLAN_PRO:plan_Sf2GSCBf5wTrzk}
-    captain: ${RAZORPAY_PLAN_CAPTAIN:plan_Sf2GSCBf5wTrzk}
-    captainPro: ${RAZORPAY_PLAN_CAPTAIN_PRO:plan_Sf2GSCBf5wTrzk}
-    proPlus: ${RAZORPAY_PLAN_PRO_PLUS:plan_Sf2GSCBf5wTrzk}
-    growth: ${RAZORPAY_PLAN_GROWTH:plan_Sf2GSCBf5wTrzk}
-    annual: ${RAZORPAY_PLAN_ANNUAL:plan_Sf2GSCBf5wTrzk}
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,metrics
-  endpoint:
-    health:
-      show-details: when-authorized
+  port: 8082
